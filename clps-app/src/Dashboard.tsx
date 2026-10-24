@@ -17,6 +17,8 @@ import {
   Layers,
   Thermometer,
   Mountain,
+  Droplet,
+  Droplets,
 } from 'lucide-react';
 import {
   LineChart,
@@ -394,6 +396,53 @@ export default function Dashboard({
                 </div>
               </div>
             )}
+
+            {/* Water Ice (ISRU) - Lemelin et al. (2021) PSJ Database */}
+            {(() => {
+              const iceVal = currentPoint.waterIcePct !== undefined && currentPoint.waterIcePct !== null ? currentPoint.waterIcePct : null;
+              const isHigh = iceVal !== null && iceVal > 50;
+              const isTrace = iceVal !== null && iceVal > 0 && iceVal <= 50;
+
+              return (
+                <div
+                  className={`p-t2-12 rounded-t2-xl transition-all duration-300 ${
+                    isHigh
+                      ? 'bg-blue-950/40 border border-blue-500/70 shadow-[0_0_20px_rgba(59,130,246,0.35)]'
+                      : 'bg-black/50 border border-t2-ash-border'
+                  }`}
+                >
+                  <div className="flex items-center justify-between mb-1">
+                    <span className="font-t2-nbarchitekt text-t2-body-sm text-t2-pale-mist flex items-center gap-1.5">
+                      <Droplets
+                        className={`w-4 h-4 ${
+                          isHigh ? 'text-blue-400 animate-pulse' : isTrace ? 'text-amber-400' : 'text-zinc-500'
+                        }`}
+                      />
+                      Water Ice (ISRU)
+                    </span>
+                    {isHigh ? (
+                      <span className="font-mono text-[9px] px-1.5 py-0.5 rounded border border-blue-400/80 bg-blue-500/25 text-blue-300 font-bold tracking-wider flex items-center gap-1 shadow-[0_0_10px_rgba(59,130,246,0.5)]">
+                        <Droplets className="w-2.5 h-2.5 text-blue-300" />
+                        HIGH ACCESS
+                      </span>
+                    ) : isTrace ? (
+                      <span className="font-mono text-[9px] px-1.5 py-0.5 rounded border border-amber-500/40 bg-amber-500/10 text-amber-400 font-bold tracking-wider">
+                        TRACE
+                      </span>
+                    ) : (
+                      <span className="font-mono text-[9px] px-1.5 py-0.5 rounded border border-zinc-600/40 bg-zinc-700/15 text-zinc-400 font-bold tracking-wider">
+                        NONE DETECTED
+                      </span>
+                    )}
+                  </div>
+                  <div className="flex items-baseline gap-1 mt-1">
+                    <span className="font-t1-unbounded text-t1-subheading font-bold text-t1-pure-white tracking-[2.66px] tabular-nums">
+                      {iceVal !== null ? `${iceVal.toFixed(1)}%` : '0.0%'}
+                    </span>
+                  </div>
+                </div>
+              );
+            })()}
 
             {/* Illumination */}
             <div className="p-t2-12 rounded-t2-xl bg-black/50 border border-t2-ash-border">

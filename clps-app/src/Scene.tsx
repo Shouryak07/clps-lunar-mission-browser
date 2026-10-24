@@ -7,6 +7,8 @@ import { useAppStore } from './store/useAppStore';
 interface SceneProps {
   sunElevation: number; // in degrees (e.g. +1.34° to +1.57°)
   earthElevation: number; // in degrees (e.g. -6.74° to +6.37°)
+  sunAzimuth?: number;
+  earthAzimuth?: number;
   heightmapUrl?: string | null;
 }
 

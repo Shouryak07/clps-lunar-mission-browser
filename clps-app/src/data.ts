@@ -15,6 +15,7 @@ export interface DataPoint {
   maxSurfaceTempK?: number | null;
   averageSlopeDeg?: number | null;
   illuminationPct?: number | null;
+  waterIcePct?: number | null;
 }
 
 export interface SiteSummary {
@@ -31,6 +32,7 @@ export interface SiteSummary {
   maxSurfaceTempK?: number | null;
   averageSlopeDeg?: number | null;
   illuminationPct?: number | null;
+  waterIcePct?: number | null;
 }
 
 export interface LandingSite {
