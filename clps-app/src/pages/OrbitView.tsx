@@ -1,198 +1,56 @@
 import { useState, useEffect, useRef, useMemo, Suspense } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useMission } from '../context/MissionContext';
-import { useFrame, useThree } from '@react-three/fiber';
-import { CameraControls, Sphere, Stars, useTexture, View, PerspectiveCamera } from '@react-three/drei';
-import * as THREE from 'three';
+import { View } from '@react-three/drei';
+import type { CameraControls } from '@react-three/drei';
 import { useAppStore } from '../store/useAppStore';
-import MoonMarker3D from '../components/MoonMarker3D';
-import SouthPoleMiniMap from '../components/SouthPoleMiniMap';
 import SitesDrawer from '../components/SitesDrawer';
-import HeatmapLegendWidget from '../components/HeatmapLegendWidget';
-import MoonHeatmap from '../components/MoonHeatmap';
-import BootSequence from '../components/BootSequence';
 import DescentOverlay from '../components/DescentOverlay';
 import FpsMonitor from '../components/FpsMonitor';
-import FooterAttribution from '../components/FooterAttribution';
+import CislunarSystem from '../components/CislunarSystem';
+import CameraPresetsBar, { type CameraPresetType } from '../components/CameraPresetsBar';
+import MissionTimelineScrubber from '../components/MissionTimelineScrubber';
+import MissionDossierModal from '../components/MissionDossierModal';
+import { CLPS_MISSIONS } from '../data/clpsMissions';
 import { getLunarLightingForDate } from '../utils/lunarLighting';
-import { useCountUp } from '../hooks/useCountUp';
+import { getLiveLunarStatus } from '../utils/lunarAstronomy';
 import { latLonToVector3 } from '../components/RingMarker';
-import { Sun, Compass } from 'lucide-react';
+import {
+  Sun,
+  Compass,
+  MapPin,
+  Layers,
+  ArrowRight,
+  Radio,
+  X,
+  FileText,
+  ChevronDown,
+  Sparkles,
+  Rocket,
+} from 'lucide-react';
 
-// Separate component for the 3D Moon sphere with texture & realistic dark albedo
-function MoonSphere() {
-  const moonTexture = useTexture("/textures/moon_1024.jpg");
-  const { gl } = useThree();
-
-  useMemo(() => {
-    if (moonTexture) {
-      moonTexture.generateMipmaps = true;
-      moonTexture.minFilter = THREE.LinearMipmapLinearFilter;
-      moonTexture.magFilter = THREE.LinearFilter;
-      moonTexture.anisotropy = Math.min(16, gl.capabilities.getMaxAnisotropy());
-      moonTexture.colorSpace = THREE.SRGBColorSpace;
-      moonTexture.needsUpdate = true;
-    }
-  }, [moonTexture, gl]);
-
-  return (
-    <Sphere args={[12, 64, 64]} position={[0, 0, 0]}>
-      <meshStandardMaterial 
-        map={moonTexture} 
-        roughness={0.92} 
-        metalness={0.04}
-        color="#a8a8b2" /* realistic dark volcanic albedo ~0.12, no flat white blowout */
-      />
-    </Sphere>
-  );
-}
-
-// Interactive Moon group with idle drift and surface-anchored markers
-function MoonGroup({
-  targetSite,
-  hoveredSite,
-  isDescending,
-  showHeatmap,
-  sites,
-  onHover,
-  onSelect,
-}: {
-  targetSite: any | null;
-  hoveredSite: any | null;
-  isDescending: boolean;
-  showHeatmap: boolean;
-  sites: any[];
-  onHover: (site: any | null) => void;
-  onSelect: (site: any) => void;
-}) {
-  const groupRef = useRef<THREE.Group>(null);
-  const { reducedMotion } = useAppStore();
-
-  useFrame((_, delta) => {
-    if (!groupRef.current) return;
-
-    // Slow idle rotation when no site is targeted/descending
-    if (!isDescending && !hoveredSite && !targetSite && !reducedMotion) {
-      groupRef.current.rotation.y += delta * 0.04;
-      // Idle southern tilt showcasing the South Pole towards viewer
-      groupRef.current.rotation.x = THREE.MathUtils.lerp(groupRef.current.rotation.x, -0.65, 0.05);
-    }
-
-    // When a site is hovered or targeted, gently rotate so it faces front (towards Z+)
-    const activeSite = targetSite || hoveredSite;
-    if (activeSite && !reducedMotion) {
-      // Calculate target Y rotation from site's longitude so it faces camera
-      const targetY = -THREE.MathUtils.degToRad(activeSite.lon);
-      groupRef.current.rotation.y = THREE.MathUtils.lerp(groupRef.current.rotation.y, targetY, 0.08);
-
-      // Southern tilt to showcase the landing site's polar latitude
-      const targetX = -0.75 - THREE.MathUtils.degToRad(activeSite.lat + 90) * 0.5;
-      groupRef.current.rotation.x = THREE.MathUtils.lerp(groupRef.current.rotation.x, targetX, 0.08);
-    } else if (!isDescending && !reducedMotion) {
-      groupRef.current.rotation.x = THREE.MathUtils.lerp(groupRef.current.rotation.x, -0.65, 0.05);
-    }
-  });
-
-  return (
-    <group ref={groupRef}>
-      <MoonSphere />
-      {/* 30-day illumination heatmap overlay */}
-      <MoonHeatmap active={showHeatmap} opacity={0.85} />
-
-      {/* Surface-anchored 3D site markers directly on Moon surface */}
-      {sites.map((site: any) => (
-        <MoonMarker3D
-          key={site.id}
-          site={site}
-          radius={12.10}
-          isHovered={hoveredSite?.id === site.id}
-          isTargeted={targetSite?.id === site.id}
-          onHover={onHover}
-          onSelect={onSelect}
-        />
-      ))}
-    </group>
-  );
-}
-
-// Cinematic Slow Zoom: keeps the Moon zoomed out first, then glides in very slowly to standard distance
-function CinematicSlowZoom({
-  cameraControlsRef,
-  isBooting,
-  reducedMotion,
-  hasCompleted,
-  onComplete,
-  userInteractedRef,
-}: {
-  cameraControlsRef: React.RefObject<CameraControls | null>;
-  isBooting: boolean;
-  reducedMotion: boolean;
-  hasCompleted: boolean;
-  onComplete: () => void;
-  userInteractedRef: React.MutableRefObject<boolean>;
-}) {
-  const START_DISTANCE = 65;
-  const TARGET_DISTANCE = 35;
-  const HOLD_DURATION = 1.4; // hold zoomed out for 1.4s so scale registers
-  const ZOOM_DURATION = 7.0; // slow, majestic 7.0s glide into standard orbit
-
-  const initializedRef = useRef(false);
-  const holdTimerRef = useRef(0);
-  const progressRef = useRef(0);
-  const isFinishedRef = useRef(hasCompleted || reducedMotion);
-
-  useFrame((_, delta) => {
-    const controls = cameraControlsRef.current;
-    if (!controls || isFinishedRef.current) return;
-
-    // First frame initialization
-    if (!initializedRef.current) {
-      initializedRef.current = true;
-      if (hasCompleted || reducedMotion) {
-        controls.setLookAt(0, 0, TARGET_DISTANCE, 0, 0, 0, false);
-        isFinishedRef.current = true;
-        return;
-      }
-      // Start zoomed out
-      controls.setLookAt(0, 0, START_DISTANCE, 0, 0, 0, false);
-    }
-
-    // If user grabbed the camera, cancel auto-zoom immediately
-    if (userInteractedRef.current) {
-      isFinishedRef.current = true;
-      onComplete();
-      return;
-    }
-
-    // Keep zoomed out while boot sequence is playing
-    if (isBooting) {
-      holdTimerRef.current = 0;
-      return;
-    }
-
-    // Hold zoomed out first
-    if (holdTimerRef.current < HOLD_DURATION) {
-      holdTimerRef.current += delta;
-      return;
-    }
-
-    // Zoom in very slowly
-    progressRef.current += delta / ZOOM_DURATION;
-    const t = Math.min(1, progressRef.current);
-    // Smooth cubic ease-in-out curve
-    const eased = t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
-    const currentDist = START_DISTANCE + (TARGET_DISTANCE - START_DISTANCE) * eased;
-
-    controls.dollyTo(currentDist, false);
-
-    if (t >= 1) {
-      isFinishedRef.current = true;
-      onComplete();
-    }
-  });
-
-  return null;
-}
+const ASTRONAUT_LOGS = [
+  {
+    title: 'Permanently Shadowed Regions (PSRs)',
+    author: 'NASA Artemis Science Team',
+    text: 'At the lunar South Pole, deep crater interiors have remained in complete darkness for over two billion years. Temperatures drop to 40 Kelvin (-233°C), preserving massive deposits of primordial water ice essential for life support and propellant production.',
+  },
+  {
+    title: 'Peak Solar Illumination',
+    author: 'LRO LOLA Laser Altimetry',
+    text: 'Elevated peaks on the rims of Shackleton Crater and Malapert Mountain receive sunlight for over 85% of the lunar year. The Sun glides horizontally across the horizon, creating grazing low-angle shadows and near-continuous solar array power.',
+  },
+  {
+    title: 'Direct-to-Earth Line of Sight',
+    author: 'JPL Deep Space Telemetry',
+    text: "Because of lunar libration (the Moon's subtle wobble), Earth oscillates between +6.5° and -6.5° relative to the polar horizon over a 27.3-day cycle. When Earth dips below the local horizon, direct radio communications are cut off.",
+  },
+  {
+    title: 'Apollo 17 Departure Log',
+    author: 'Eugene Cernan (Commander)',
+    text: 'As we leave the Moon at Taurus-Littrow, we leave as we came and, God willing, as we shall return, with peace and hope for all mankind. Godspeed the crew of Apollo 17.',
+  },
+];
 
 export default function OrbitView() {
   const navigate = useNavigate();
@@ -200,47 +58,59 @@ export default function OrbitView() {
   const {
     phase,
     setPhase,
-    overlayOpacity,
     setOverlayOpacity,
     reducedMotion,
     setReducedMotion,
-    lowQuality,
-    bootComplete,
-    gatePassed,
-    hasCompletedOpeningZoom,
-    setHasCompletedOpeningZoom,
     setViewReady,
   } = useAppStore();
 
   const cameraControlsRef = useRef<CameraControls | null>(null);
-  const userInteractedRef = useRef(false);
 
+  // Mission & 3D space state
+  const [activeMissionId, setActiveMissionId] = useState<string>('im-1');
+  const [timelineProgress, setTimelineProgress] = useState<number>(0.55);
+  const [isPlaying, setIsPlaying] = useState<boolean>(false);
+  const [cameraPreset, setCameraPreset] = useState<CameraPresetType>('system');
+  const [isDossierOpen, setIsDossierOpen] = useState<boolean>(false);
+
+  // Surface inspection state
   const [hoveredSite, setHoveredSite] = useState<any | null>(null);
   const [targetSite, setTargetSite] = useState<any | null>(null);
-  const [showHeatmap, setShowHeatmap] = useState(false);
-  const [showBoot, setShowBoot] = useState((!bootComplete || !gatePassed) && !reducedMotion);
+  const [showHeatmap, setShowHeatmap] = useState<boolean>(false);
+  const [activeLogIndex, setActiveLogIndex] = useState<number | null>(null);
+  const [isMissionDropdownOpen, setIsMissionDropdownOpen] = useState<boolean>(false);
 
-  // Sync showBoot when gate & boot complete
-  useEffect(() => {
-    if (bootComplete && gatePassed) {
-      setShowBoot(false);
-    }
-  }, [bootComplete, gatePassed]);
+  // Current active CLPS mission object
+  const activeMission = useMemo(() => {
+    return CLPS_MISSIONS.find((m) => m.id === activeMissionId) || CLPS_MISSIONS[0];
+  }, [activeMissionId]);
 
-  // Signal view readiness for tour
+  // Signal view readiness
   useEffect(() => {
     setViewReady(true);
     return () => setViewReady(false);
   }, [setViewReady]);
 
-  // Real astronomical lighting for today's UTC date
+  // Trajectory playback ticker
+  useEffect(() => {
+    if (!isPlaying) return;
+    const interval = setInterval(() => {
+      setTimelineProgress((prev) => {
+        if (prev >= 1) {
+          setIsPlaying(false);
+          return 1;
+        }
+        return Math.min(1, prev + 0.003);
+      });
+    }, 50);
+    return () => clearInterval(interval);
+  }, [isPlaying]);
+
+  // Astronomical status calculations
   const lighting = useMemo(() => getLunarLightingForDate(new Date()), []);
+  const liveLunar = useMemo(() => getLiveLunarStatus(new Date()), []);
 
-  // Real data stat strip count-up
-  const animatedSiteCount = useCountUp(8, 0, 600);
-  const animatedHours = useCountUp(720, 0, 800);
-
-  // Check prefers-reduced-motion
+  // System reduced-motion listener
   useEffect(() => {
     const mediaQuery = window.matchMedia('(prefers-reduced-motion: reduce)');
     setReducedMotion(mediaQuery.matches);
@@ -249,29 +119,16 @@ export default function OrbitView() {
     return () => mediaQuery.removeEventListener('change', handler);
   }, [setReducedMotion]);
 
-  // Initial fade-in overlay
-  useEffect(() => {
-    setOverlayOpacity(1);
-    const timer = setTimeout(() => setOverlayOpacity(0), 100);
-    return () => clearTimeout(timer);
-  }, [setOverlayOpacity]);
+  // Handle touchdown descent sequence into LOLA DEM 5m/px view
+  const handleSelectSite = (siteOrId: any) => {
+    const site =
+      typeof siteOrId === 'string'
+        ? SITES.find((s: any) => s.id === siteOrId) || SITES[0]
+        : siteOrId;
 
-  // Cancel slow zoom or descent if user grabs or controls camera
-  const handleControlStart = () => {
-    userInteractedRef.current = true;
-    if (phase === 'descending') {
-      setPhase('idle');
-      setTargetSite(null);
-      setOverlayOpacity(0);
-    }
-  };
-
-  // ── THE DESCENT SEQUENCE (Unchanged core logic) ──
-  const handleSelect = (site: any) => {
     setSelectedSite(site);
     setTargetSite(site);
 
-    // If reduced-motion is preferred, bypass 3D camera travel with an instant fade
     if (reducedMotion) {
       setOverlayOpacity(1);
       setTimeout(() => navigate(`/mission/${site.id}`), 250);
@@ -281,10 +138,7 @@ export default function OrbitView() {
     setPhase('descending');
 
     if (cameraControlsRef.current) {
-      // 1. Calculate target vector on sphere
       const sitePos = latLonToVector3(site.lat, site.lon, 12);
-      
-      // 2. Rotate to face the target coordinates (1.2s smooth ease)
       const normal = sitePos.clone().normalize();
       const approachCamPos = normal.clone().multiplyScalar(13.8);
 
@@ -295,17 +149,15 @@ export default function OrbitView() {
         sitePos.x,
         sitePos.y,
         sitePos.z,
-        true // enable transition
+        true
       );
 
-      // 3. Dolly in through the surface into the terrain view
       setTimeout(() => {
         if (cameraControlsRef.current) {
           cameraControlsRef.current.dollyTo(12.5, true);
         }
       }, 1200);
 
-      // 4. Crossfade into the 3D terrain view at touchdown
       setTimeout(() => {
         setOverlayOpacity(1);
       }, 1800);
@@ -318,174 +170,297 @@ export default function OrbitView() {
     }
   };
 
-  return (
-    <div className="h-screen w-full bg-transparent text-t2-ghost-white relative overflow-hidden select-none">
-      {/* ── Skippable Boot Sequence (Fast <10s intro, auto-disabled under reduced motion) ── */}
-      {showBoot && <BootSequence onComplete={() => setShowBoot(false)} />}
+  const activeFocusSite = targetSite || hoveredSite;
 
+  return (
+    <div className="h-screen w-full bg-transparent text-white relative overflow-hidden select-none">
       {/* ── Crossfade Descent Overlay ── */}
       <DescentOverlay onCancel={() => setTargetSite(null)} />
 
-      {/* ── 3D Moon Viewport via Persistent Canvas ── */}
+      {/* ── 3D Cislunar Earth-Moon System Viewport ── */}
       <View className="absolute inset-0 z-0 pointer-events-auto">
         <Suspense fallback={null}>
-          <PerspectiveCamera
-            makeDefault
-            position={[0, 0, hasCompletedOpeningZoom || reducedMotion ? 35 : 65]}
-            fov={45}
+          <CislunarSystem
+            mission={activeMission}
+            progress={timelineProgress}
+            onProgressChange={setTimelineProgress}
+            cameraPreset={cameraPreset}
+            onSelectPreset={setCameraPreset}
+            sites={SITES}
+            hoveredSite={hoveredSite}
+            targetSite={targetSite}
+            isDescending={phase === 'descending'}
+            showHeatmap={showHeatmap}
+            onHoverSite={setHoveredSite}
+            onSelectSite={handleSelectSite}
+            onSelectAstronaut={() => {
+              setActiveLogIndex((prev) => ((prev ?? -1) + 1) % ASTRONAUT_LOGS.length);
+            }}
+            cameraControlsRef={cameraControlsRef}
           />
-          {/* Real Sun Directional Light for Today's UTC Date */}
-          <directionalLight
-            position={[
-              lighting.sunVector[0] * 50,
-              lighting.sunVector[1] * 50,
-              lighting.sunVector[2] * 50,
-            ]}
-            intensity={2.8}
-            color="#fffcf2"
-          />
-
-          {/* Faint Earthshine (cool blue fill light from sub-Earth coordinates) */}
-          <directionalLight
-            position={[
-              lighting.earthVector[0] * 40,
-              lighting.earthVector[1] * 40,
-              lighting.earthVector[2] * 40,
-            ]}
-            intensity={0.22}
-            color="#93c5fd"
-          />
-
-          {/* Deep space ambient baseline */}
-          <ambientLight intensity={0.06} />
-
-          <Stars radius={110} depth={50} count={4000} factor={4} saturation={0} fade speed={0.5} />
-
-          {/* Moon sphere & surface-anchored site markers (deferred until gatePassed is true) */}
-          {gatePassed && (
-            <MoonGroup
-              targetSite={targetSite}
-              hoveredSite={hoveredSite}
-              isDescending={phase === 'descending'}
-              showHeatmap={showHeatmap}
-              sites={SITES}
-              onHover={setHoveredSite}
-              onSelect={handleSelect}
-            />
-          )}
-
-          {/* CameraControls */}
-          <CameraControls
-            ref={cameraControlsRef}
-            makeDefault
-            smoothTime={0.35}
-            minDistance={14}
-            maxDistance={70}
-            minPolarAngle={Math.PI / 2 - 0.35}
-            maxPolarAngle={Math.PI / 2 + 0.35}
-            onStart={handleControlStart}
-          />
-
-          {/* Cinematic Opening: Keep Moon zoomed out first and zoom in very slowly */}
-          {gatePassed && (
-            <CinematicSlowZoom
-              cameraControlsRef={cameraControlsRef}
-              isBooting={showBoot}
-              reducedMotion={reducedMotion}
-              hasCompleted={hasCompletedOpeningZoom}
-              onComplete={() => setHasCompletedOpeningZoom(true)}
-              userInteractedRef={userInteractedRef}
-            />
-          )}
         </Suspense>
       </View>
 
-      {/* ── Redesigned UI Overlay (Zero backdrop blur on canvas) ── */}
-      <div className="absolute inset-0 z-10 flex flex-col justify-between p-4 sm:p-6 pointer-events-none">
-        {/* Top Header Bar: Thesis & Stat Strip (Left) + Primary CTA & Accessible Drawer (Right) */}
-        <header className="w-full flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 pointer-events-auto">
-          {/* Active Theory Thesis Panel (Positioned away from Moon, AA contrast) */}
-          <div className={`bg-black/80 border border-t2-ash-border rounded-t2-xl p-3.5 sm:p-4 max-w-lg shadow-none space-y-2 transition-all duration-700 delay-100 ease-out-expo ${showBoot ? 'opacity-0 -translate-y-2' : 'opacity-100 translate-y-0'}`}>
-            <h1 className="font-t1-unbounded text-xs sm:text-sm font-bold text-t1-pure-white tracking-[2.38px] uppercase leading-snug">
-              Where on the Moon can a lander survive the night?
-            </h1>
-            
-            <p className="font-t2-nbarchitekt text-[10px] text-t2-smoke flex items-center gap-1.5">
-              <Sun className="w-3 h-3 text-amber-400" />
-              <span>Terminator computed for {lighting.dateUtcString} UTC (NASA SPICE)</span>
-            </p>
+      {/* ── Minimalist Clean Hero Overlay ── */}
+      <div className="absolute inset-0 z-10 flex flex-col justify-between p-5 pointer-events-none">
+        {/* Top Header Bar */}
+        <header className="w-full flex items-center justify-between gap-4 pointer-events-auto">
+          {/* Brand Wordmark & Mission Selector */}
+          <div className="flex items-center gap-3">
+            <div className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse shrink-0" />
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="font-['Space_Grotesk'] text-sm tracking-[0.2em] uppercase font-bold text-white">
+                  CLPS Space Explorer
+                </span>
+                <span className="hidden sm:inline-block px-2 py-0.5 rounded text-[10px] font-mono uppercase bg-white/10 text-zinc-300">
+                  Cislunar 3D System
+                </span>
+              </div>
 
-            {/* Real Data Stat Strip */}
-            <div className="pt-2 border-t border-zinc-800 flex items-center gap-4 text-xs font-t2-nbarchitekt text-t2-pale-mist tabular-nums">
-              <div>
-                <span className="font-t1-unbounded font-bold text-white text-sm">
-                  {animatedSiteCount}
-                </span>{' '}
-                <span className="text-[10px] text-t2-smoke uppercase">Sites</span>
-              </div>
-              <span className="text-zinc-700">•</span>
-              <div>
-                <span className="font-bold text-white font-mono">
-                  85.4°S – 89.9°S
-                </span>{' '}
-                <span className="text-[10px] text-t2-smoke uppercase">Span</span>
-              </div>
-              <span className="text-zinc-700">•</span>
-              <div>
-                <span className="font-bold text-white font-mono">
-                  {animatedHours}h
-                </span>{' '}
-                <span className="text-[10px] text-t2-smoke uppercase">Ephemeris</span>
+              {/* Mission Selector Dropdown */}
+              <div className="relative mt-1">
+                <button
+                  onClick={() => setIsMissionDropdownOpen(!isMissionDropdownOpen)}
+                  className="flex items-center gap-2 text-xs font-mono text-amber-300 hover:text-amber-200 transition-colors"
+                >
+                  <Rocket className="w-3.5 h-3.5 text-amber-400" />
+                  <span className="font-bold underline decoration-dotted">
+                    {activeMission.name}
+                  </span>
+                  <ChevronDown className="w-3 h-3" />
+                </button>
+
+                {isMissionDropdownOpen && (
+                  <div className="absolute top-6 left-0 w-64 bg-[#0a0b12] border border-white/20 rounded-xl p-1 shadow-2xl z-50 animate-in fade-in zoom-in-95">
+                    {CLPS_MISSIONS.map((m) => (
+                      <button
+                        key={m.id}
+                        onClick={() => {
+                          setActiveMissionId(m.id);
+                          setTimelineProgress(0.5);
+                          setIsMissionDropdownOpen(false);
+                        }}
+                        className={`w-full text-left px-3 py-2 rounded-lg text-xs font-mono transition-colors flex items-center justify-between ${
+                          m.id === activeMissionId
+                            ? 'bg-amber-400/20 text-amber-300 font-bold'
+                            : 'text-zinc-300 hover:bg-white/10'
+                        }`}
+                      >
+                        <div>
+                          <div>{m.name}</div>
+                          <div className="text-[10px] text-zinc-400">{m.provider}</div>
+                        </div>
+                        <span className="text-[9px] uppercase px-1.5 py-0.5 rounded bg-white/5 text-zinc-400">
+                          {m.targetSiteName.split(' ')[0]}
+                        </span>
+                      </button>
+                    ))}
+                  </div>
+                )}
               </div>
             </div>
           </div>
 
-          {/* Top-Right Action Controls */}
-          <div className={`flex items-center gap-2.5 transition-all duration-700 delay-200 ease-out-expo ${showBoot ? 'opacity-0 -translate-y-2' : 'opacity-100 translate-y-0'}`}>
-            {/* Primary CTA: Dusk Violet Pill with White Label */}
+          {/* Center Camera Presets Bar */}
+          <div className="hidden md:flex">
+            <CameraPresetsBar
+              currentPreset={cameraPreset}
+              onSelectPreset={setCameraPreset}
+              onNavigateToSurface={() => handleSelectSite(activeMission.linkedSiteId)}
+            />
+          </div>
+
+          {/* Top-Right Minimal Actions */}
+          <div className="flex items-center gap-2.5">
+            {/* Mission Dossier Modal Button */}
             <button
-              onClick={() => navigate('/compare')}
-              className="bg-t2-dusk-violet text-t2-ghost-white rounded-full px-5 sm:px-6 py-2.5 font-t2-nbarchitekt text-xs font-bold uppercase tracking-wider hover:opacity-90 transition-all border border-t2-dusk-violet shadow-none focus:outline-none focus:ring-1 focus:ring-white"
+              onClick={() => setIsDossierOpen(true)}
+              className="bg-black/50 hover:bg-white/10 text-zinc-300 hover:text-white border border-white/15 rounded-full px-3 py-1.5 font-['Space_Grotesk'] text-xs uppercase tracking-wider transition-all flex items-center gap-1.5"
             >
-              Compare sites →
+              <FileText className="w-3.5 h-3.5 text-amber-400" />
+              <span className="hidden sm:inline">Dossier</span>
             </button>
 
-            {/* Collapsed Accessible Sites Drawer */}
+            {/* Heatmap Toggle */}
+            <button
+              onClick={() => setShowHeatmap(!showHeatmap)}
+              className={`px-3 py-1.5 rounded-full text-xs font-mono tracking-wider uppercase transition-all flex items-center gap-1.5 border ${
+                showHeatmap
+                  ? 'bg-amber-500/20 text-amber-300 border-amber-500/40'
+                  : 'bg-black/40 text-zinc-400 border-white/10 hover:border-white/25 hover:text-white'
+              }`}
+            >
+              <Layers className="w-3.5 h-3.5" />
+              <span className="hidden sm:inline">{showHeatmap ? 'Heatmap: On' : 'Heatmap'}</span>
+            </button>
+
+            {/* Compare Sites Link */}
+            <button
+              onClick={() => navigate('/compare')}
+              className="bg-white/10 hover:bg-white/20 text-white border border-white/15 rounded-full px-3.5 py-1.5 font-['Space_Grotesk'] text-xs font-semibold uppercase tracking-wider transition-all"
+            >
+              Compare
+            </button>
+
+            {/* Sites Drawer */}
             <SitesDrawer
               sites={SITES}
               hoveredSite={hoveredSite}
               targetSite={targetSite}
               onHover={setHoveredSite}
-              onSelect={handleSelect}
+              onSelect={handleSelectSite}
             />
           </div>
         </header>
 
-        {/* Bottom Interactive Area: South Pole Mini-Map (Left) + Heatmap Layer Widget (Right) */}
-        <div className={`w-full flex items-end justify-between gap-4 pointer-events-auto transition-all duration-700 delay-300 ease-out-expo ${showBoot ? 'opacity-0 translate-y-2' : 'opacity-100 translate-y-0'}`}>
-          {/* South-Pole Polar Mini-Map */}
-          <SouthPoleMiniMap
-            sites={SITES}
-            hoveredSite={hoveredSite}
-            targetSite={targetSite}
-            onHover={setHoveredSite}
-            onSelect={handleSelect}
-          />
-
-          {/* Illumination Heatmap Layer Toggle with Perceptual Ramp Legend */}
-          <HeatmapLegendWidget
-            active={showHeatmap}
-            onToggle={() => setShowHeatmap(!showHeatmap)}
+        {/* Mobile Camera Presets Bar */}
+        <div className="flex md:hidden justify-center pointer-events-auto">
+          <CameraPresetsBar
+            currentPreset={cameraPreset}
+            onSelectPreset={setCameraPreset}
+            onNavigateToSurface={() => handleSelectSite(activeMission.linkedSiteId)}
           />
         </div>
 
-        {/* Global Footer Attribution Bar */}
-        <div className={`w-full pointer-events-auto -mx-4 sm:-mx-6 -mb-4 sm:-mb-6 pt-3 transition-all duration-700 delay-400 ease-out-expo ${showBoot ? 'opacity-0 translate-y-2' : 'opacity-100 translate-y-0'}`}>
-          <FooterAttribution />
+        {/* Bottom Panel: Interactive Scrubber + Contextual Cards */}
+        <div className="w-full flex flex-col items-center gap-3">
+          {/* Contextual Landing Site or Mission Destination Preview Card */}
+          {activeFocusSite && (
+            <div className="max-w-md w-full bg-[#0a0b12]/90 backdrop-blur-md border border-white/15 rounded-2xl p-4 space-y-2 pointer-events-auto animate-in fade-in slide-in-from-bottom-3 shadow-2xl">
+              <div className="flex items-center justify-between">
+                <span className="text-[11px] font-mono text-amber-400 uppercase tracking-widest font-semibold flex items-center gap-1.5">
+                  <MapPin className="w-3.5 h-3.5" />
+                  {activeFocusSite.label}
+                </span>
+                <span className="text-xs font-mono text-zinc-400 tabular-nums">
+                  {Math.abs(activeFocusSite.lat).toFixed(1)}°S, {Math.abs(activeFocusSite.lon).toFixed(1)}°E
+                </span>
+              </div>
+
+              <div>
+                <h3 className="font-['Space_Grotesk'] text-base font-bold text-white tracking-wide">
+                  {activeFocusSite.name}
+                </h3>
+                <p className="text-xs text-zinc-300 leading-relaxed line-clamp-2">
+                  {activeFocusSite.description}
+                </p>
+              </div>
+
+              <div className="pt-2 border-t border-white/10 flex items-center justify-between">
+                <span className="text-[10px] font-mono text-zinc-400">
+                  LOLA 5m/px DEM Altimetry Ready
+                </span>
+                <button
+                  onClick={() => handleSelectSite(activeFocusSite)}
+                  className="bg-amber-400 hover:bg-amber-300 text-black font-['Space_Grotesk'] text-xs font-bold uppercase tracking-wider px-3.5 py-1.5 rounded-lg flex items-center gap-1.5 transition-all shadow-md"
+                >
+                  <span>Touchdown 3D View</span>
+                  <ArrowRight className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* Interactive Mission Timeline Scrubber */}
+          <MissionTimelineScrubber
+            mission={activeMission}
+            progress={timelineProgress}
+            onProgressChange={setTimelineProgress}
+            isPlaying={isPlaying}
+            onTogglePlay={() => setIsPlaying(!isPlaying)}
+          />
+
+          {/* Bottom Footer Info Strip */}
+          <div className="w-full flex items-center justify-between text-xs font-mono text-zinc-400 pointer-events-auto">
+            {/* Astronaut hint / button */}
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => setActiveLogIndex((prev) => ((prev ?? -1) + 1) % ASTRONAUT_LOGS.length)}
+                className="bg-black/50 hover:bg-white/10 backdrop-blur-sm border border-white/10 rounded-full px-3 py-1.5 text-xs font-mono text-amber-300 flex items-center gap-1.5 transition-all"
+                title="Open astronaut exploration logs"
+              >
+                <Radio className="w-3.5 h-3.5 text-amber-400 animate-pulse" />
+                <span>Astronaut Logs</span>
+              </button>
+              <span className="hidden sm:inline text-zinc-500 text-[11px]">
+                • Drag to orbit • Scroll to zoom • Click spacecraft to track
+              </span>
+            </div>
+
+            {/* Real-time Astronomical Status Pill */}
+            <div className="bg-black/60 backdrop-blur-md border border-white/10 rounded-full px-4 py-1.5 text-[11px] font-mono text-zinc-300 tabular-nums flex items-center gap-2.5">
+              <span className="flex items-center gap-1.5 text-amber-300">
+                <Sun className="w-3 h-3 text-amber-400" />
+                <span>{liveLunar.phaseName} ({liveLunar.illuminationPct}%)</span>
+              </span>
+              <span className="text-zinc-600">•</span>
+              <span className="text-sky-300">
+                {liveLunar.distanceKm.toLocaleString()} km
+              </span>
+              <span className="text-zinc-600">•</span>
+              <span className="text-zinc-400">{lighting.dateUtcString} UTC</span>
+            </div>
+          </div>
         </div>
       </div>
 
-      {/* FPS & Quality Monitor HUD */}
+      {/* ── Mission Dossier Modal ── */}
+      <MissionDossierModal
+        mission={activeMission}
+        isOpen={isDossierOpen}
+        onClose={() => setIsDossierOpen(false)}
+        onSelectSite={handleSelectSite}
+      />
+
+      {/* ── Astronaut Mission Insight Modal ── */}
+      {activeLogIndex !== null && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200 pointer-events-auto">
+          <div className="max-w-md w-full bg-[#0a0b12] border border-white/20 rounded-2xl p-6 shadow-2xl space-y-4">
+            <div className="flex items-center justify-between border-b border-white/10 pb-3">
+              <div className="flex items-center gap-2 text-amber-400 text-xs font-mono font-bold tracking-wider uppercase">
+                <Radio className="w-4 h-4 animate-pulse" />
+                <span>Astronaut Exploration Transmission</span>
+              </div>
+              <button
+                onClick={() => setActiveLogIndex(null)}
+                className="text-zinc-400 hover:text-white p-1 rounded-lg hover:bg-white/10 transition-colors"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="space-y-2">
+              <div className="text-[10px] font-mono uppercase text-zinc-500 tracking-widest font-semibold">
+                LOG #{activeLogIndex + 1} • {ASTRONAUT_LOGS[activeLogIndex].author}
+              </div>
+              <h4 className="font-['Space_Grotesk'] text-lg font-bold text-white">
+                {ASTRONAUT_LOGS[activeLogIndex].title}
+              </h4>
+              <p className="text-xs text-zinc-300 font-sans leading-relaxed pt-1">
+                "{ASTRONAUT_LOGS[activeLogIndex].text}"
+              </p>
+            </div>
+
+            <div className="pt-3 border-t border-white/10 flex items-center justify-between text-[11px] font-mono text-zinc-400">
+              <button
+                onClick={() => setActiveLogIndex((prev) => ((prev ?? 0) + 1) % ASTRONAUT_LOGS.length)}
+                className="text-amber-400 hover:text-amber-300 transition-colors underline decoration-dotted"
+              >
+                Next transmission →
+              </button>
+              <button
+                onClick={() => setActiveLogIndex(null)}
+                className="px-3 py-1 rounded bg-white/10 hover:bg-white/20 text-white font-sans text-xs transition-colors"
+              >
+                Dismiss
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* FPS & Performance HUD */}
       <FpsMonitor />
     </div>
   );

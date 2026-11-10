@@ -2,16 +2,7 @@ import { create } from 'zustand';
 
 export type AppPhase = 'boot' | 'idle' | 'descending' | 'terrain' | 'returning';
 
-const checkInitialGatePassed = () => {
-  if (typeof window === 'undefined') return false;
-  try {
-    const params = new URLSearchParams(window.location.search);
-    if (params.has('skipgate')) return true;
-    return window.sessionStorage.getItem('clps_start_gate_passed') === 'true';
-  } catch {
-    return false;
-  }
-};
+const checkInitialGatePassed = () => true;
 
 interface AppState {
   // Navigation phase
@@ -84,7 +75,7 @@ interface AppState {
 }
 
 export const useAppStore = create<AppState>((set) => ({
-  phase: 'boot',
+  phase: 'idle',
   setPhase: (p) => set({ phase: p }),
 
   pendingNavSiteId: null,
@@ -99,7 +90,7 @@ export const useAppStore = create<AppState>((set) => ({
   demoPreviousRoute: null,
   demoSliderIndex: null,
   demoShowRadarModal: false,
-  viewReady: false,
+  viewReady: true,
   setDemoMode: (on) => set({ demoMode: on, demoStep: 0, demoPaused: false, demoSliderIndex: null, demoShowRadarModal: false }),
   setDemoStep: (n) => set({ demoStep: n, demoSliderIndex: null }),
   setDemoPaused: (paused) => set({ demoPaused: paused }),
@@ -108,7 +99,7 @@ export const useAppStore = create<AppState>((set) => ({
   setDemoShowRadarModal: (show) => set({ demoShowRadarModal: show }),
   setViewReady: (ready) => set({ viewReady: ready }),
 
-  overlayOpacity: 1,
+  overlayOpacity: 0,
   setOverlayOpacity: (v) => set({ overlayOpacity: v }),
 
   fps: 60,
@@ -121,7 +112,7 @@ export const useAppStore = create<AppState>((set) => ({
   reducedMotion: false,
   setReducedMotion: (v) => set({ reducedMotion: v }),
 
-  gatePassed: checkInitialGatePassed(),
+  gatePassed: true,
   setGatePassed: (v) => {
     if (typeof window !== 'undefined' && v) {
       try {
@@ -133,9 +124,9 @@ export const useAppStore = create<AppState>((set) => ({
   pendingTourFromGate: false,
   setPendingTourFromGate: (v) => set({ pendingTourFromGate: v }),
 
-  bootComplete: false,
+  bootComplete: true,
   setBootComplete: (v) => set({ bootComplete: v }),
-  hasCompletedOpeningZoom: false,
+  hasCompletedOpeningZoom: true,
   setHasCompletedOpeningZoom: (v) => set({ hasCompletedOpeningZoom: v }),
 
   verticalExaggeration: 1.5,

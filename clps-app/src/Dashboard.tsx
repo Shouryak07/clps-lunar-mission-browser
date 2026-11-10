@@ -1,10 +1,11 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
   Sun,
   Globe,
   Clock,
   MapPin,
-  Rocket,
+  ArrowLeft,
   Compass,
   Radio,
   ChevronRight,
@@ -54,6 +55,7 @@ export default function Dashboard({
   onSelectSite,
   isSiteFetching,
 }: DashboardProps) {
+  const navigate = useNavigate();
   const { SITES } = useMission();
   const {
     verticalExaggeration,
@@ -102,123 +104,81 @@ export default function Dashboard({
   const startTime = telemetryData[0]?.time ?? 'Start';
   const endTime = telemetryData[totalPoints - 1]?.time ?? 'End';
 
-  // ── LIVING NUMBERS HOOKS ──
-  const animatedSunElevation = useCountUp(currentPoint.sunElevation, 2, 250);
-  const animatedEarthElevation = useCountUp(currentPoint.earthElevation, 2, 250);
-  const animatedSolar = useCountUp(currentPoint.solarIrradiance || 0, 1, 250);
-  const animatedBattery = useCountUp(currentPoint.batteryLevel || 100, 1, 250);
+  // Living Numbers count-up hooks
+  const animatedSunElevation = useCountUp(currentPoint.sunElevation, 2, 200);
+  const animatedEarthElevation = useCountUp(currentPoint.earthElevation, 2, 200);
+  const animatedSolar = useCountUp(currentPoint.solarIrradiance || 0, 1, 200);
+  const animatedBattery = useCountUp(currentPoint.batteryLevel || 100, 1, 200);
 
-  // Decode scramble on site name and coordinates
-  const scrambledSiteName = useDecodeScramble(selectedSite.name || '', 500);
+  const scrambledSiteName = useDecodeScramble(selectedSite.name || '', 400);
   const latDir = selectedSite.lat >= 0 ? '°N' : '°S';
   const lonDir = selectedSite.lon >= 0 ? '°E' : '°W';
   const coordString = `${Math.abs(selectedSite.lat).toFixed(1)}${latDir}, ${Math.abs(selectedSite.lon).toFixed(1)}${lonDir}`;
-  const scrambledCoords = useDecodeScramble(coordString, 600);
+  const scrambledCoords = useDecodeScramble(coordString, 500);
 
-  // Comms status styling using Data Tokens
-  const commsStatus = currentPoint.commsStatus;
-  const commsColor =
-    commsStatus === 'NOMINAL'
-      ? 'text-data-nominal-text bg-data-nominal/15 border-data-nominal/40'
-      : commsStatus === 'DEGRADED' || commsStatus === 'WEAK'
-      ? 'text-data-degraded-text bg-data-degraded/15 border-data-degraded/40'
-      : 'text-data-blackout-text bg-data-blackout/15 border-data-blackout/40';
+  const isLos = currentPoint.earthElevation >= 0;
+  const isDaylight = currentPoint.sunElevation >= 0;
 
   return (
-    <div className="flex h-screen w-screen bg-transparent text-t2-ghost-white select-none overflow-hidden relative">
-      {/* ── Left Sidebar (Active Theory Shell + OHZI Typography + Times Editorial) ── */}
-      <aside className="w-[320px] flex-shrink-0 bg-black/50 backdrop-blur-[4px] border-r border-t2-ash-border flex flex-col z-10 overflow-hidden">
-        <div className="flex flex-col flex-1 overflow-y-auto min-h-0">
-          {/* Header */}
-          <div className="p-t2-16 border-b border-t2-ash-border flex-shrink-0">
-            <div className="flex items-center gap-3">
-              <div className="p-2 rounded-t2-md bg-t2-dusk-violet text-t2-ghost-white border border-t2-dusk-violet">
-                <Rocket className="w-5 h-5" />
-              </div>
-              <div>
-                <h1 className="font-t1-unbounded text-t1-body font-bold text-t1-pure-white tracking-[2.38px] uppercase">
-                  CLPS LUNAR
-                </h1>
-                <p className="font-t2-nbarchitekt text-t2-caption text-t2-pale-mist uppercase tracking-widest">
-                  Mission Browser
-                </p>
-              </div>
-            </div>
+    <div className="flex h-screen w-full bg-transparent text-white overflow-hidden select-none">
+      {/* ── Left Telemetry Rail (Sleek Obsidian Mission Cockpit) ── */}
+      <aside className="w-80 flex-shrink-0 bg-[#090a10]/95 backdrop-blur-md border-r border-white/10 flex flex-col justify-between z-10 overflow-hidden">
+        {/* Top Header & Back to Orbit Navigation */}
+        <div className="p-4 border-b border-white/10 flex-shrink-0 space-y-3">
+          <div className="flex items-center justify-between">
+            <button
+              onClick={() => navigate('/')}
+              className="text-xs font-mono text-zinc-400 hover:text-white flex items-center gap-1.5 transition-colors py-1 px-2 rounded border border-white/10 hover:border-white/20 bg-black/40"
+            >
+              <ArrowLeft className="w-3.5 h-3.5" />
+              <span>Orbit View</span>
+            </button>
+            <span className="text-[10px] font-mono uppercase tracking-widest text-emerald-400 font-bold flex items-center gap-1">
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+              Telemetry
+            </span>
           </div>
 
-          {/* Landing Sites Section */}
-          <div className="p-t2-16 border-b border-t2-ash-border flex-shrink-0">
-            <div className="flex items-center justify-between mb-2.5">
-              <span className="font-t1-unbounded text-t1-caption font-semibold text-t1-pure-white tracking-[2.63px] uppercase flex items-center gap-1.5">
-                <MapPin className="w-3.5 h-3.5 text-t2-pale-mist" />
-                Landing Sites
-              </span>
-              <span className="font-t2-nbarchitekt text-t2-caption text-t2-smoke">
-                {SITES.length} Targets
-              </span>
+          <div>
+            <div className="text-[11px] font-mono uppercase text-amber-400 font-semibold tracking-wider">
+              {scrambledCoords}
             </div>
-
-            {/* Scrollable site list */}
-            <div className="space-y-1.5 max-h-[190px] overflow-y-auto pr-1">
-              {SITES.map((site: any) => {
-                const isSelected = selectedSite.id === site.id;
-                return (
-                  <button
-                    key={site.id}
-                    onClick={() => onSelectSite(site)}
-                    disabled={isSiteFetching}
-                    className={`w-full text-left px-t2-12 py-2 rounded-t2-md font-t2-nbarchitekt text-t2-body-sm transition-colors flex items-center justify-between border ${
-                      isSelected
-                        ? 'bg-t2-dusk-violet text-t2-ghost-white border-t2-dusk-violet'
-                        : 'bg-black/30 text-t2-pale-mist border-t2-ash-border hover:bg-white/[0.08] hover:text-t2-ghost-white'
-                    } ${isSiteFetching ? 'opacity-60 cursor-not-allowed' : 'cursor-pointer'}`}
-                  >
-                    <span className="font-medium truncate">{site.label}</span>
-                    {isSelected && isSiteFetching ? (
-                      <Loader2 className="w-3.5 h-3.5 flex-shrink-0 text-t2-ghost-white animate-spin" />
-                    ) : (
-                      <ChevronRight
-                        className={`w-3.5 h-3.5 flex-shrink-0 transition-transform ${
-                          isSelected ? 'rotate-90 text-t2-ghost-white' : 'text-t2-smoke'
-                        }`}
-                      />
-                    )}
-                  </button>
-                );
-              })}
-            </div>
-
-            {/* Selected Site Details (Decode/Scramble & Times Editorial Prose) */}
-            <div className="mt-t2-12 p-t2-12 bg-black/40 rounded-t2-md border border-t2-ash-border font-t2-nbarchitekt text-t2-caption space-y-1.5 text-t2-pale-mist">
-              <div className="flex justify-between items-center">
-                <span className="text-t2-smoke">Target:</span>
-                <span className="font-t1-unbounded text-t1-caption font-semibold text-t1-pure-white tracking-[2.63px] uppercase">
-                  {scrambledSiteName}
-                </span>
-              </div>
-              <div className="flex justify-between items-center">
-                <span className="text-t2-smoke">Coordinates:</span>
-                <span className="text-t2-ghost-white font-t2-nbarchitekt text-t2-caption font-mono">
-                  {scrambledCoords}
-                </span>
-              </div>
-              <div className="pt-1 border-t border-t2-ash-border/50">
-                <span className="text-t2-smoke block mb-0.5">Mission Site Notes:</span>
-                <p className="font-t2-times text-[14px] leading-[1.88] text-t2-pale-mist font-normal">
-                  {selectedSite.description}
-                </p>
-              </div>
-            </div>
+            <h1 className="font-['Space_Grotesk'] text-lg font-bold text-white tracking-wide truncate">
+              {scrambledSiteName}
+            </h1>
           </div>
 
-          {/* Mission Timeline Slider (Scrub-to-live) */}
-          <div className="p-t2-16 border-b border-t2-ash-border flex-shrink-0">
-            <div className="flex items-center justify-between mb-2">
-              <span className="font-t1-unbounded text-t1-caption font-semibold text-t1-pure-white tracking-[2.63px] uppercase flex items-center gap-1.5">
-                <Clock className="w-3.5 h-3.5 text-t2-pale-mist" />
-                Mission Timeline
+          {/* Quick Target Site Switcher */}
+          <div className="relative">
+            <select
+              value={selectedSite.id}
+              onChange={(e) => {
+                const target = SITES.find((s: any) => s.id === e.target.value);
+                if (target) onSelectSite(target);
+              }}
+              disabled={isSiteFetching}
+              className="w-full bg-black/60 border border-white/15 text-xs font-mono text-zinc-200 rounded-lg px-3 py-2 appearance-none focus:outline-none focus:border-white/40 cursor-pointer"
+            >
+              {SITES.map((site: any) => (
+                <option key={site.id} value={site.id} className="bg-zinc-950 text-white">
+                  {site.label} ({site.lat.toFixed(1)}°S)
+                </option>
+              ))}
+            </select>
+            <ChevronRight className="w-3.5 h-3.5 absolute right-3 top-3 text-zinc-400 pointer-events-none rotate-90" />
+          </div>
+        </div>
+
+        {/* Scrollable Center: Mission Timeline Scrubber & Telemetry Metrics */}
+        <div className="flex-1 overflow-y-auto p-4 space-y-4">
+          {/* Mission Timeline Scrubber */}
+          <div className="bg-black/40 border border-white/10 rounded-xl p-3.5 space-y-2">
+            <div className="flex items-center justify-between text-xs font-mono">
+              <span className="text-zinc-400 uppercase tracking-wider flex items-center gap-1.5">
+                <Clock className="w-3.5 h-3.5 text-amber-400" />
+                Timeline
               </span>
-              <span className="font-t2-nbarchitekt text-t2-body-sm text-t2-ghost-white border border-t2-ash-border rounded-t2-md px-2 py-0.5 bg-black/40 tabular-nums">
+              <span className="text-white font-bold bg-white/10 px-2 py-0.5 rounded tabular-nums">
                 {currentPoint.time}
               </span>
             </div>
@@ -230,321 +190,165 @@ export default function Dashboard({
               step={1}
               value={currentIndex}
               onChange={handleSliderChange}
-              className="w-full h-1.5 bg-t2-ash-border rounded-t2-md appearance-none cursor-pointer accent-t2-dusk-violet focus:outline-none transition-all"
+              className="w-full h-1.5 bg-zinc-800 rounded-lg appearance-none cursor-pointer accent-amber-400 focus:outline-none"
             />
 
-            <div className="flex justify-between font-t2-nbarchitekt text-t2-caption text-t2-smoke mt-1.5 tabular-nums">
+            <div className="flex justify-between text-[10px] font-mono text-zinc-500 tabular-nums">
               <span>{startTime}</span>
-              <span className="text-t2-pale-mist">Step {currentIndex + 1}/{totalPoints}</span>
+              <span className="text-zinc-400">Step {currentIndex + 1}/{totalPoints}</span>
               <span>{endTime}</span>
             </div>
           </div>
 
-          {/* Telemetry Cards Section (Living Numbers + Odometer) */}
-          <div className="p-t2-16 space-y-2.5">
-            <div className="flex items-center justify-between">
-              <span className="font-t1-unbounded text-t1-caption font-semibold text-t1-pure-white tracking-[2.63px] uppercase">
-                Telemetry ({currentPoint.time})
-              </span>
-              <Radio className="w-3.5 h-3.5 text-data-nominal animate-pulse" />
+          {/* Section: Horizon Angles (Sun & Earth) */}
+          <div className="space-y-2">
+            <div className="text-[10px] font-mono tracking-widest uppercase text-zinc-500 font-bold">
+              Astronomical Horizon
             </div>
 
-            {/* Sun Elevation Card */}
-            <div className="p-t2-12 rounded-t2-xl bg-black/50 border border-t2-ash-border">
-              <div className="flex items-center justify-between mb-1">
-                <span className="font-t2-nbarchitekt text-t2-body-sm text-t2-pale-mist flex items-center gap-1.5">
-                  <Sun className="w-4 h-4 text-data-sun" />
-                  Sun Elevation
-                </span>
-                <div className="flex items-center gap-1.5">
-                  <span className="font-mono text-[9px] px-1.5 py-0.5 rounded border border-emerald-500/40 bg-emerald-500/10 text-emerald-400 font-bold">
-                    REAL: SPICE
-                  </span>
+            {/* Sun Elevation */}
+            <div className="bg-black/40 border border-white/10 rounded-xl p-3 flex items-center justify-between">
+              <div>
+                <div className="text-xs font-mono text-zinc-400 flex items-center gap-1.5">
+                  <Sun className="w-3.5 h-3.5 text-amber-400" />
+                  <span>Sun Elevation</span>
                   <button
                     onClick={() => setActiveExplainerMetric('sunElevation')}
+                    className="text-zinc-500 hover:text-amber-300"
                     title="How is solar elevation computed?"
-                    className="text-t2-smoke hover:text-indigo-400 p-0.5 transition-colors"
                   >
-                    <Info className="w-3.5 h-3.5" />
+                    <Info className="w-3 h-3" />
                   </button>
-                  <span className="font-t2-nbarchitekt text-t2-caption px-2 py-0.5 rounded-t2-full border border-t2-ash-border text-t2-ghost-white bg-black/40">
-                    {currentPoint.sunElevation >= 0 ? 'DAYLIGHT' : 'ECLIPSE'}
-                  </span>
+                </div>
+                <div className="font-['Space_Grotesk'] text-xl font-bold text-white tabular-nums mt-0.5">
+                  {parseFloat(animatedSunElevation) > 0 ? '+' : ''}{animatedSunElevation}°
                 </div>
               </div>
-              <div className="flex items-baseline gap-1 mt-1">
-                <span className="font-t1-unbounded text-t1-subheading font-bold text-t1-pure-white tracking-[2.66px] tabular-nums">
-                  {parseFloat(animatedSunElevation) > 0 ? '+' : ''}
-                  {animatedSunElevation}
-                </span>
-                <span className="font-t2-nbarchitekt text-t2-caption text-t2-smoke">deg</span>
-              </div>
+              <span
+                className={`text-[10px] font-mono px-2 py-0.5 rounded-full font-bold uppercase ${
+                  isDaylight
+                    ? 'bg-amber-400/20 text-amber-300 border border-amber-400/30'
+                    : 'bg-zinc-800 text-zinc-400 border border-zinc-700'
+                }`}
+              >
+                {isDaylight ? 'Daylight' : 'Eclipse'}
+              </span>
             </div>
 
-            {/* Earth Elevation Card */}
-            <div className="p-t2-12 rounded-t2-xl bg-black/50 border border-t2-ash-border">
-              <div className="flex items-center justify-between mb-1">
-                <span className="font-t2-nbarchitekt text-t2-body-sm text-t2-pale-mist flex items-center gap-1.5">
-                  <Globe className="w-4 h-4 text-data-earth" />
-                  Earth Elevation
-                </span>
-                <div className="flex items-center gap-1.5">
-                  <span className="font-mono text-[9px] px-1.5 py-0.5 rounded border border-emerald-500/40 bg-emerald-500/10 text-emerald-400 font-bold">
-                    REAL: SPICE
-                  </span>
+            {/* Earth Elevation */}
+            <div className="bg-black/40 border border-white/10 rounded-xl p-3 flex items-center justify-between">
+              <div>
+                <div className="text-xs font-mono text-zinc-400 flex items-center gap-1.5">
+                  <Globe className="w-3.5 h-3.5 text-sky-400" />
+                  <span>Earth Elevation</span>
                   <button
                     onClick={() => setActiveExplainerMetric('earthElevation')}
+                    className="text-zinc-500 hover:text-sky-300"
                     title="How is Earth elevation computed?"
-                    className="text-t2-smoke hover:text-indigo-400 p-0.5 transition-colors"
                   >
-                    <Info className="w-3.5 h-3.5" />
+                    <Info className="w-3 h-3" />
                   </button>
-                  <span className="font-t2-nbarchitekt text-t2-caption px-2 py-0.5 rounded-t2-full border border-t2-ash-border text-t2-ghost-white bg-black/40">
-                    {currentPoint.earthElevation >= 0 ? 'LOS ACTIVE' : 'NO COMM'}
-                  </span>
+                </div>
+                <div className="font-['Space_Grotesk'] text-xl font-bold text-white tabular-nums mt-0.5">
+                  {parseFloat(animatedEarthElevation) > 0 ? '+' : ''}{animatedEarthElevation}°
                 </div>
               </div>
-              <div className="flex items-baseline gap-1 mt-1">
-                <span className="font-t1-unbounded text-t1-subheading font-bold text-t1-pure-white tracking-[2.66px] tabular-nums">
-                  {parseFloat(animatedEarthElevation) > 0 ? '+' : ''}
-                  {animatedEarthElevation}
-                </span>
-                <span className="font-t2-nbarchitekt text-t2-caption text-t2-smoke">deg</span>
-              </div>
+              <span
+                className={`text-[10px] font-mono px-2 py-0.5 rounded-full font-bold uppercase ${
+                  isLos
+                    ? 'bg-sky-500/20 text-sky-300 border border-sky-500/30'
+                    : 'bg-red-500/20 text-red-400 border border-red-500/30'
+                }`}
+              >
+                {isLos ? 'LOS Active' : 'No Comm'}
+              </span>
+            </div>
+          </div>
+
+          {/* Section: Power & Environment */}
+          <div className="space-y-2">
+            <div className="text-[10px] font-mono tracking-widest uppercase text-zinc-500 font-bold">
+              Power & Environment
             </div>
 
             {/* Solar Irradiance */}
             {currentPoint.solarIrradiance !== undefined && (
-              <div className="p-t2-12 rounded-t2-xl bg-black/50 border border-t2-ash-border">
-                <div className="flex items-center justify-between mb-1">
-                  <span className="font-t2-nbarchitekt text-t2-body-sm text-t2-pale-mist flex items-center gap-1.5">
-                    <Zap className="w-4 h-4 text-data-sun" />
-                    Solar Irradiance
-                  </span>
-                  <div className="flex items-center gap-1.5">
-                    <span className="font-mono text-[9px] px-1.5 py-0.5 rounded border border-amber-500/40 bg-amber-500/10 text-amber-400 font-bold">
-                      PHYSICAL MODEL
-                    </span>
+              <div className="bg-black/40 border border-white/10 rounded-xl p-3 flex items-center justify-between">
+                <div>
+                  <div className="text-xs font-mono text-zinc-400 flex items-center gap-1.5">
+                    <Zap className="w-3.5 h-3.5 text-amber-400" />
+                    <span>Solar Irradiance</span>
                     <button
                       onClick={() => setActiveExplainerMetric('solarIrradiance')}
-                      title="How is solar irradiance computed?"
-                      className="text-t2-smoke hover:text-indigo-400 p-0.5 transition-colors"
+                      className="text-zinc-500 hover:text-amber-300"
                     >
-                      <Info className="w-3.5 h-3.5" />
+                      <Info className="w-3 h-3" />
                     </button>
                   </div>
-                </div>
-                <div className="flex items-baseline gap-1 mt-1">
-                  <span className="font-t1-unbounded text-t1-subheading font-bold text-t1-pure-white tracking-[2.66px] tabular-nums">
-                    {animatedSolar}
-                  </span>
-                  <span className="font-t2-nbarchitekt text-t2-caption text-t2-smoke">W/m²</span>
-                </div>
-              </div>
-            )}
-
-            {/* Surface Temp */}
-            {currentPoint.maxSurfaceTempK !== undefined && (
-              <div className="p-t2-12 rounded-t2-xl bg-black/50 border border-t2-ash-border">
-                <div className="flex items-center justify-between mb-1">
-                  <span className="font-t2-nbarchitekt text-t2-body-sm text-t2-pale-mist flex items-center gap-1.5">
-                    <Thermometer className={`w-4 h-4 ${currentPoint.maxSurfaceTempK !== null && currentPoint.maxSurfaceTempK < 150 ? 'text-blue-400' : 'text-amber-400'}`} />
-                    Surface Temp
-                  </span>
-                  {currentPoint.maxSurfaceTempK !== null && currentPoint.maxSurfaceTempK < 150 ? (
-                    <span className="font-mono text-[9px] px-1.5 py-0.5 rounded border border-blue-500/50 bg-blue-500/15 text-blue-400 font-bold tracking-wider animate-pulse">
-                      CRITICAL COLD
-                    </span>
-                  ) : (
-                    <span className="font-mono text-[9px] px-1.5 py-0.5 rounded border border-zinc-700/60 bg-white/[0.04] text-zinc-400 font-bold tracking-wider">
-                      DIVINER GCP
-                    </span>
-                  )}
-                </div>
-                <div className="flex items-baseline gap-1 mt-1">
-                  <span className={`font-t1-unbounded text-t1-subheading font-bold tracking-[2.66px] tabular-nums ${
-                    currentPoint.maxSurfaceTempK !== null && currentPoint.maxSurfaceTempK < 150 ? 'text-blue-400' : 'text-t1-pure-white'
-                  }`}>
-                    {currentPoint.maxSurfaceTempK !== null ? `${Math.round(currentPoint.maxSurfaceTempK)}K` : 'N/A'}
-                  </span>
-                </div>
-              </div>
-            )}
-
-            {/* Terrain Slope */}
-            {currentPoint.averageSlopeDeg !== undefined && (
-              <div className="p-t2-12 rounded-t2-xl bg-black/50 border border-t2-ash-border">
-                <div className="flex items-center justify-between mb-1">
-                  <span className="font-t2-nbarchitekt text-t2-body-sm text-t2-pale-mist flex items-center gap-1.5">
-                    <Mountain className={`w-4 h-4 ${currentPoint.averageSlopeDeg !== null && currentPoint.averageSlopeDeg > 15 ? 'text-rose-400' : 'text-emerald-400'}`} />
-                    Terrain Slope
-                  </span>
-                  {currentPoint.averageSlopeDeg !== null && currentPoint.averageSlopeDeg > 15 ? (
-                    <span className="font-mono text-[9px] px-1.5 py-0.5 rounded border border-rose-500/60 bg-rose-500/20 text-rose-400 font-bold tracking-wider flex items-center gap-1 animate-pulse">
-                      HAZARD
-                    </span>
-                  ) : (
-                    <span className="font-mono text-[9px] px-1.5 py-0.5 rounded border border-emerald-500/40 bg-emerald-500/10 text-emerald-400 font-bold tracking-wider">
-                      NOMINAL
-                    </span>
-                  )}
-                </div>
-                <div className="flex items-baseline gap-1 mt-1">
-                  <span className="font-t1-unbounded text-t1-subheading font-bold text-t1-pure-white tracking-[2.66px] tabular-nums">
-                    {currentPoint.averageSlopeDeg !== null ? `${currentPoint.averageSlopeDeg.toFixed(1)}°` : 'N/A'}
-                  </span>
-                </div>
-              </div>
-            )}
-
-            {/* Water Ice (ISRU) - Lemelin et al. (2021) PSJ Database */}
-            {(() => {
-              const iceVal = currentPoint.waterIcePct !== undefined && currentPoint.waterIcePct !== null ? currentPoint.waterIcePct : null;
-              const isHigh = iceVal !== null && iceVal > 50;
-              const isTrace = iceVal !== null && iceVal > 0 && iceVal <= 50;
-
-              return (
-                <div
-                  className={`p-t2-12 rounded-t2-xl transition-all duration-300 ${
-                    isHigh
-                      ? 'bg-blue-950/40 border border-blue-500/70 shadow-[0_0_20px_rgba(59,130,246,0.35)]'
-                      : 'bg-black/50 border border-t2-ash-border'
-                  }`}
-                >
-                  <div className="flex items-center justify-between mb-1">
-                    <span className="font-t2-nbarchitekt text-t2-body-sm text-t2-pale-mist flex items-center gap-1.5">
-                      <Droplets
-                        className={`w-4 h-4 ${
-                          isHigh ? 'text-blue-400 animate-pulse' : isTrace ? 'text-amber-400' : 'text-zinc-500'
-                        }`}
-                      />
-                      Water Ice (ISRU)
-                    </span>
-                    {isHigh ? (
-                      <span className="font-mono text-[9px] px-1.5 py-0.5 rounded border border-blue-400/80 bg-blue-500/25 text-blue-300 font-bold tracking-wider flex items-center gap-1 shadow-[0_0_10px_rgba(59,130,246,0.5)]">
-                        <Droplets className="w-2.5 h-2.5 text-blue-300" />
-                        HIGH ACCESS
-                      </span>
-                    ) : isTrace ? (
-                      <span className="font-mono text-[9px] px-1.5 py-0.5 rounded border border-amber-500/40 bg-amber-500/10 text-amber-400 font-bold tracking-wider">
-                        TRACE
-                      </span>
-                    ) : (
-                      <span className="font-mono text-[9px] px-1.5 py-0.5 rounded border border-zinc-600/40 bg-zinc-700/15 text-zinc-400 font-bold tracking-wider">
-                        NONE DETECTED
-                      </span>
-                    )}
-                  </div>
-                  <div className="flex items-baseline gap-1 mt-1">
-                    <span className="font-t1-unbounded text-t1-subheading font-bold text-t1-pure-white tracking-[2.66px] tabular-nums">
-                      {iceVal !== null ? `${iceVal.toFixed(1)}%` : '0.0%'}
-                    </span>
+                  <div className="font-['Space_Grotesk'] text-lg font-bold text-white tabular-nums mt-0.5">
+                    {animatedSolar} <span className="text-xs font-mono font-normal text-zinc-400">W/m²</span>
                   </div>
                 </div>
-              );
-            })()}
-
-            {/* Illumination */}
-            <div className="p-t2-12 rounded-t2-xl bg-black/50 border border-t2-ash-border">
-              <div className="flex items-center justify-between mb-1">
-                <span className="font-t2-nbarchitekt text-t2-body-sm text-t2-pale-mist flex items-center gap-1.5">
-                  <Sun className="w-4 h-4 text-data-sun" />
-                  Illumination
-                </span>
-                <span className="font-mono text-[9px] px-1.5 py-0.5 rounded border border-amber-500/40 bg-amber-500/10 text-amber-400 font-bold tracking-wider">
-                  {currentPoint.illuminationPct !== null && currentPoint.illuminationPct !== undefined ? 'LOLA HORIZON' : 'GLOBAL'}
-                </span>
               </div>
-              <div className="flex items-baseline gap-1 mt-1">
-                <span className="font-t1-unbounded text-t1-subheading font-bold text-t1-pure-white tracking-[2.66px] tabular-nums">
-                  {currentPoint.illuminationPct !== null && currentPoint.illuminationPct !== undefined
-                    ? `${currentPoint.illuminationPct.toFixed(1)}%`
-                    : 'N/A'}
-                </span>
-              </div>
-            </div>
+            )}
 
             {/* Battery Level */}
             {currentPoint.batteryLevel !== undefined && (
-              <div className="p-t2-12 rounded-t2-xl bg-black/50 border border-t2-ash-border">
-                <div className="flex items-center justify-between mb-1">
-                  <span className="font-t2-nbarchitekt text-t2-body-sm text-t2-pale-mist flex items-center gap-1.5">
-                    <Battery className="w-4 h-4 text-data-nominal" />
-                    Battery Level
+              <div className="bg-black/40 border border-white/10 rounded-xl p-3 space-y-1.5">
+                <div className="flex items-center justify-between text-xs font-mono text-zinc-400">
+                  <span className="flex items-center gap-1.5">
+                    <Battery className="w-3.5 h-3.5 text-emerald-400" />
+                    <span>Battery Storage</span>
                   </span>
-                  <div className="flex items-center gap-1.5">
-                    <span className="font-mono text-[9px] px-1.5 py-0.5 rounded border border-purple-500/40 bg-purple-500/10 text-purple-400 font-bold">
-                      SIMULATED
-                    </span>
-                    <button
-                      onClick={() => setActiveExplainerMetric('batteryLevel')}
-                      title="How is battery state of charge computed?"
-                      className="text-t2-smoke hover:text-indigo-400 p-0.5 transition-colors"
-                    >
-                      <Info className="w-3.5 h-3.5" />
-                    </button>
-                  </div>
+                  <span className="text-white font-bold tabular-nums">{animatedBattery}%</span>
                 </div>
-                <div className="flex items-center gap-2 mt-1">
-                  <span className="font-t1-unbounded text-t1-body font-bold text-t1-pure-white tracking-[2.38px] tabular-nums">
-                    {animatedBattery}%
-                  </span>
-                  <div className="flex-1 h-1.5 bg-black/60 rounded-t2-md overflow-hidden border border-t2-ash-border">
-                    <div
-                      className="h-full w-full bg-data-nominal will-change-transform origin-left transition-transform duration-300"
-                      style={{ transform: `scaleX(${Math.min(currentPoint.batteryLevel, 100) / 100})` }}
-                    />
-                  </div>
+                <div className="w-full h-1.5 bg-zinc-800 rounded-full overflow-hidden">
+                  <div
+                    className="h-full bg-emerald-400 transition-all duration-300 rounded-full"
+                    style={{ width: `${Math.min(currentPoint.batteryLevel, 100)}%` }}
+                  />
                 </div>
               </div>
             )}
 
-            {/* Comms Status Indicator */}
-            {currentPoint.commsStatus !== undefined && (
-              <div className={`p-t2-12 rounded-t2-md border font-t2-nbarchitekt text-t2-caption flex items-center justify-between ${commsColor}`}>
-                <span className="flex items-center gap-1.5">
-                  <Signal className="w-3.5 h-3.5" />
-                  Comms Status
-                </span>
-                <div className="flex items-center gap-1.5">
-                  <span className="font-mono text-[9px] px-1.5 py-0.5 rounded border border-blue-500/40 bg-blue-500/10 text-blue-300 font-bold">
-                    SIMULATED LINK
-                  </span>
-                  <button
-                    onClick={() => setActiveExplainerMetric('dataRate')}
-                    title="How is comms status computed?"
-                    className="text-t2-smoke hover:text-indigo-400 p-0.5 transition-colors"
-                  >
-                    <Info className="w-3.5 h-3.5" />
-                  </button>
-                  <span className="font-bold tracking-wider">{currentPoint.commsStatus}</span>
+            {/* Surface Temperature */}
+            {currentPoint.maxSurfaceTempK !== undefined && currentPoint.maxSurfaceTempK !== null && (
+              <div className="bg-black/40 border border-white/10 rounded-xl p-3 flex items-center justify-between">
+                <div>
+                  <div className="text-xs font-mono text-zinc-400 flex items-center gap-1.5">
+                    <Thermometer className="w-3.5 h-3.5 text-blue-400" />
+                    <span>Max Surface Temp</span>
+                  </div>
+                  <div className="font-['Space_Grotesk'] text-lg font-bold text-white tabular-nums mt-0.5">
+                    {currentPoint.maxSurfaceTempK.toFixed(1)} <span className="text-xs font-mono font-normal text-zinc-400">K</span>
+                  </div>
                 </div>
+                {currentPoint.maxSurfaceTempK < 150 && (
+                  <span className="text-[9px] font-mono font-bold uppercase text-blue-300 bg-blue-500/20 border border-blue-500/30 px-2 py-0.5 rounded">
+                    Deep Freeze
+                  </span>
+                )}
               </div>
             )}
           </div>
         </div>
 
         {/* Sidebar Footer */}
-        <div className="p-t2-12 border-t border-t2-ash-border bg-black/50 flex items-center justify-between font-t2-nbarchitekt text-t2-caption text-t2-smoke flex-shrink-0">
+        <div className="p-3 border-t border-white/10 bg-black/60 flex items-center justify-between text-[11px] font-mono text-zinc-400 flex-shrink-0">
           <button
             onClick={() => setDataMethodsModalOpen(true)}
-            className="flex items-center gap-1.5 hover:text-indigo-400 transition-colors"
+            className="flex items-center gap-1 hover:text-white transition-colors underline decoration-dotted"
           >
-            <Compass className="w-3 h-3 text-indigo-400" />
-            <span className="underline decoration-dotted underline-offset-2">NASA SPICE / LOLA DEM</span>
+            <BookOpen className="w-3 h-3 text-indigo-400" />
+            <span>Data Methods</span>
           </button>
-          <span className="text-data-nominal tabular-nums">● {totalPoints} PTS</span>
-          <div className="flex items-center gap-1.5">
-            <Compass className="w-3 h-3 text-t2-pale-mist" />
-            <span>NASA JPL DE421 Ephemeris</span>
-          </div>
-          <span className="text-data-nominal tabular-nums">● {totalPoints} PTS</span>
+          <span className="text-emerald-400 font-bold tabular-nums">● {totalPoints} PTS</span>
         </div>
       </aside>
 
-      {/* ── Right Main Area ── */}
+      {/* ── Main Area (3D Terrain Scene + 30-Day Recharts Profile) ── */}
       <main className="flex-1 flex flex-col h-full min-w-0">
-        {/* Top Section (3D View - 60% height) */}
+        {/* Top Section (3D Surface View - 60% height) */}
         <div className="relative w-full h-[60%] bg-transparent overflow-hidden">
           <Scene
             sunElevation={currentPoint.sunElevation}
@@ -556,164 +360,147 @@ export default function Dashboard({
 
           {/* Loading overlay when switching sites */}
           {isSiteFetching && (
-            <div className="absolute inset-0 bg-black/60 backdrop-blur-[4px] flex items-center justify-center z-20">
-              <div className="flex items-center gap-3 px-t2-16 py-t2-12 rounded-t2-md bg-black/80 border border-t2-ash-border text-t2-ghost-white font-t2-nbarchitekt text-t2-body-sm">
-                <Loader2 className="w-4 h-4 animate-spin text-t2-pale-mist" />
+            <div className="absolute inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-20">
+              <div className="flex items-center gap-3 px-4 py-3 rounded-xl bg-zinc-950 border border-white/20 text-white font-mono text-xs">
+                <Loader2 className="w-4 h-4 animate-spin text-amber-400" />
                 Loading {selectedSite.name} ephemeris…
               </div>
             </div>
           )}
 
-          {/* Top Left Overlay Badge + Vertical Exaggeration & Scientific Tools */}
-          <div className="absolute top-20 left-4 z-10 flex flex-wrap items-center gap-2">
-            <div className="px-t2-12 py-t2-6 rounded-t2-md bg-black/60 backdrop-blur-[4px] border border-t2-ash-border flex items-center gap-2">
-              <div className="w-2 h-2 rounded-t2-full bg-data-nominal animate-ping" />
-              <span className="font-t2-nbarchitekt text-t2-body-sm text-t2-ghost-white">
-                {selectedSite.label} (3D View)
-              </span>
+          {/* Top Left Overlay Badge + Vertical Exaggeration */}
+          <div className="absolute top-4 left-4 z-10 flex flex-wrap items-center gap-2">
+            <div className="px-3 py-1.5 rounded-lg bg-black/60 backdrop-blur-md border border-white/15 flex items-center gap-2 font-mono text-xs">
+              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+              <span className="text-white font-medium">LOLA 5m/px DEM</span>
+              <span className="text-zinc-500">|</span>
+              <span className="text-zinc-300">{selectedSite.label}</span>
             </div>
 
-            {/* Vertical Exaggeration Segmented Selector */}
-            <div className="px-2 py-1 rounded-t2-md bg-black/70 backdrop-blur-[4px] border border-t2-ash-border flex items-center gap-1.5 font-t2-nbarchitekt text-xs">
-              <span className="text-t2-smoke uppercase tracking-wider text-[10px]">VE:</span>
+            {/* Vertical Exaggeration Selector */}
+            <div className="px-2 py-1 rounded-lg bg-black/60 backdrop-blur-md border border-white/15 flex items-center gap-1 font-mono text-xs">
+              <span className="text-zinc-400 text-[10px] uppercase">VE:</span>
               {[
-                { label: '1.0x True', val: 1.0 },
+                { label: '1.0x', val: 1.0 },
                 { label: '1.5x', val: 1.5 },
-                { label: '2.0x Enh', val: 2.0 },
+                { label: '2.0x', val: 2.0 },
                 { label: '3.0x', val: 3.0 },
               ].map((item) => (
                 <button
                   key={item.val}
                   onClick={() => setVerticalExaggeration(item.val)}
-                  className={`px-1.5 py-0.5 rounded text-[11px] transition-colors ${
+                  className={`px-1.5 py-0.5 rounded text-[10px] transition-colors ${
                     verticalExaggeration === item.val
-                      ? 'bg-t2-dusk-violet text-white font-bold'
-                      : 'text-t2-pale-mist hover:text-white hover:bg-white/10'
+                      ? 'bg-amber-400 text-black font-bold'
+                      : 'text-zinc-400 hover:text-white'
                   }`}
                 >
                   {item.label}
                 </button>
               ))}
             </div>
-
-            {/* Data & Methods Trigger */}
-            <button
-              onClick={() => setDataMethodsModalOpen(true)}
-              className="px-2.5 py-1 rounded-t2-md bg-black/70 backdrop-blur-[4px] border border-t2-ash-border text-xs font-t2-nbarchitekt text-t2-ghost-white hover:text-white hover:bg-white/10 flex items-center gap-1.5 transition-colors"
-            >
-              <BookOpen className="w-3.5 h-3.5 text-indigo-400" />
-              <span>Data & Methods</span>
-            </button>
           </div>
 
-          {/* Top Right Overlay: Sun / Earth / Ticking Mission Clock HUD */}
-          <div className="absolute top-20 right-4 z-10 flex items-center gap-2">
-            <div className="px-t2-12 py-t2-6 rounded-t2-md bg-black/50 backdrop-blur-[4px] border border-t2-ash-border flex items-center gap-3 font-t2-nbarchitekt text-t2-body-sm tabular-nums">
-              <span className="text-t2-pale-mist flex items-center gap-1">
-                <Sun className="w-3.5 h-3.5 text-data-sun" />
-                Sun: <strong className="text-t2-ghost-white">{animatedSunElevation}°</strong>
+          {/* Top Right Live Telemetry HUD */}
+          <div className="absolute top-4 right-4 z-10 flex items-center gap-2">
+            <div className="px-3 py-1.5 rounded-lg bg-black/60 backdrop-blur-md border border-white/15 flex items-center gap-3 font-mono text-xs tabular-nums">
+              <span className="flex items-center gap-1.5 text-amber-300">
+                <Sun className="w-3.5 h-3.5 text-amber-400" />
+                <span>Sun: <strong>{animatedSunElevation}°</strong></span>
               </span>
-              <span className="text-t2-smoke">|</span>
-              <span className="text-t2-pale-mist flex items-center gap-1">
-                <Globe className="w-3.5 h-3.5 text-data-earth" />
-                Earth: <strong className="text-t2-ghost-white">{animatedEarthElevation}°</strong>
+              <span className="text-zinc-600">|</span>
+              <span className="flex items-center gap-1.5 text-sky-300">
+                <Globe className="w-3.5 h-3.5 text-sky-400" />
+                <span>Earth: <strong>{animatedEarthElevation}°</strong></span>
               </span>
-              <span className="text-t2-smoke">|</span>
-              <span className="text-t2-pale-mist flex items-center gap-1">
-                <Clock className="w-3.5 h-3.5 text-data-nominal" />
-                Clock: <strong className="text-t2-ghost-white">{missionClock.formatted}</strong>
+              <span className="text-zinc-600">|</span>
+              <span className="text-zinc-400">
+                Clock: <strong className="text-white">{missionClock.formatted}</strong>
               </span>
             </div>
           </div>
 
-          {/* Bottom Right Controls Tip */}
-          <div className="absolute bottom-3 right-4 z-10 font-t2-nbarchitekt text-t2-caption text-t2-smoke bg-black/60 backdrop-blur-[4px] px-t2-12 py-1 rounded-t2-md border border-t2-ash-border">
-            Rotate: Left Click + Drag | Pan: Right Click | Zoom: Scroll
+          {/* Controls Tip */}
+          <div className="absolute bottom-3 right-4 z-10 font-mono text-[10px] text-zinc-400 bg-black/60 backdrop-blur-sm px-3 py-1 rounded border border-white/10">
+            Rotate: Left Click • Pan: Right Click • Zoom: Scroll
           </div>
         </div>
 
-        {/* Bottom Section (Charts - 40% height) */}
-        <div className="w-full h-[40%] bg-black/50 backdrop-blur-[4px] border-t border-t2-ash-border p-t2-16 flex flex-col justify-between overflow-hidden">
+        {/* Bottom Section (Dual-Line Telemetry Profile - 40% height) */}
+        <div className="w-full h-[40%] bg-[#08090e] border-t border-white/10 p-4 flex flex-col justify-between overflow-hidden">
           {/* Chart Header */}
           <div className="flex items-center justify-between mb-1 flex-shrink-0">
             <div className="flex items-center gap-3">
-              <h2 className="font-t1-unbounded text-t1-caption font-semibold tracking-[2.63px] uppercase text-t1-pure-white">
-                30-Day Solar & Earth Elevation Profile
+              <h2 className="font-['Space_Grotesk'] text-xs font-bold tracking-wider uppercase text-white">
+                30-Day Solar & Earth Horizon Elevation Profile
               </h2>
-              <span className="font-t2-nbarchitekt text-t2-caption text-t2-smoke border border-t2-ash-border px-2 py-0.5 rounded-t2-md">
-                {selectedSite.name} — 720 Hourly Ephemeris Readings
+              <span className="font-mono text-[10px] text-zinc-400 border border-white/10 px-2 py-0.5 rounded">
+                {selectedSite.name} • 720 Hours (NASA JPL DE421)
               </span>
             </div>
-            <div className="flex items-center gap-3 font-t2-nbarchitekt text-t2-caption tabular-nums">
-              <span className="flex items-center gap-1.5 text-data-sun">
-                <span className="w-2 h-2 rounded-t2-full bg-data-sun" />
+            <div className="flex items-center gap-4 font-mono text-xs tabular-nums">
+              <span className="flex items-center gap-1.5 text-amber-400">
+                <span className="w-2 h-2 rounded-full bg-amber-400" />
                 Sun Elevation
               </span>
-              <span className="flex items-center gap-1.5 text-data-earth">
-                <span className="w-2 h-2 rounded-t2-full bg-data-earth" />
+              <span className="flex items-center gap-1.5 text-sky-400">
+                <span className="w-2 h-2 rounded-full bg-sky-400" />
                 Earth Elevation
               </span>
-              <span className="flex items-center gap-1.5 text-data-nominal font-bold">
-                <span className="w-2 h-2 rounded-t2-full bg-data-nominal" />
-                Cursor: {currentPoint.time}
+              <span className="flex items-center gap-1.5 text-emerald-400 font-bold">
+                <span className="w-2 h-2 rounded-full bg-emerald-400" />
+                Step: {currentPoint.time}
               </span>
             </div>
           </div>
 
-          {/* Recharts LineChart */}
+          {/* Recharts Dual-Line Chart */}
           <div className="w-full flex-1 min-h-0">
             <ResponsiveContainer width="100%" height="100%">
               <LineChart
                 data={telemetryData}
-                margin={{ top: 10, right: 30, left: 0, bottom: 5 }}
+                margin={{ top: 8, right: 24, left: -10, bottom: 0 }}
               >
-                <CartesianGrid strokeDasharray="3 3" stroke="#262626" vertical={false} />
+                <CartesianGrid strokeDasharray="3 3" stroke="#181924" vertical={false} />
                 <XAxis
                   dataKey="time"
                   interval={xAxisInterval}
-                  stroke="#4d4d4d"
-                  tick={{ fill: '#808080', fontSize: 10, fontFamily: 'nbarchitekt, Space Grotesk, monospace' }}
-                  tickLine={{ stroke: '#4d4d4d' }}
+                  stroke="#33374a"
+                  tick={{ fill: '#71768c', fontSize: 10, fontFamily: 'JetBrains Mono, monospace' }}
+                  tickLine={{ stroke: '#33374a' }}
                 />
                 <YAxis
-                  stroke="#4d4d4d"
+                  stroke="#33374a"
                   unit="°"
-                  tick={{ fill: '#808080', fontSize: 10, fontFamily: 'nbarchitekt, Space Grotesk, monospace' }}
-                  tickLine={{ stroke: '#4d4d4d' }}
+                  tick={{ fill: '#71768c', fontSize: 10, fontFamily: 'JetBrains Mono, monospace' }}
+                  tickLine={{ stroke: '#33374a' }}
                   type="number"
                   domain={[-90, 90]}
                   ticks={[-90, -45, 0, 45, 90]}
                 />
                 <Tooltip
                   contentStyle={{
-                    backgroundColor: '#000000',
-                    borderColor: '#4d4d4d',
-                    borderRadius: '5px',
-                    fontSize: '12px',
-                    fontFamily: 'nbarchitekt, Space Grotesk, monospace',
+                    backgroundColor: '#0a0b12',
+                    borderColor: '#2d3148',
+                    borderRadius: '8px',
+                    fontSize: '11px',
+                    fontFamily: 'JetBrains Mono, monospace',
                   }}
                   itemStyle={{ color: '#ffffff' }}
-                  labelStyle={{ color: '#c6c6c6', fontWeight: 'bold' }}
+                  labelStyle={{ color: '#94a3b8', fontWeight: 'bold' }}
                   formatter={(value: any) => [
                     `${Number(value) > 0 ? '+' : ''}${Number(value).toFixed(2)}°`,
                     '',
                   ]}
                 />
-                <Legend
-                  wrapperStyle={{
-                    paddingTop: '2px',
-                    fontSize: '10px',
-                    fontFamily: 'nbarchitekt, Space Grotesk, monospace',
-                  }}
-                />
 
                 <ReferenceLine
                   y={0}
-                  stroke="#4d4d4d"
+                  stroke="#475569"
                   strokeDasharray="2 2"
                   label={{
-                    value: 'Horizon 0°',
-                    fill: '#808080',
+                    value: 'Horizon (0°)',
+                    fill: '#64748b',
                     fontSize: 10,
                     position: 'insideBottomRight',
                   }}
@@ -729,7 +516,7 @@ export default function Dashboard({
                     fill: '#10b981',
                     fontSize: 10,
                     position: 'top',
-                    fontFamily: 'nbarchitekt, Space Grotesk, monospace',
+                    fontFamily: 'JetBrains Mono, monospace',
                   }}
                 />
 
@@ -737,29 +524,29 @@ export default function Dashboard({
                   type="monotone"
                   dataKey="sunElevation"
                   name="Sun Elevation"
-                  stroke="#fbbf24"
+                  stroke="#ffb84d"
                   strokeWidth={2}
                   dot={false}
                   isAnimationActive={false}
-                  activeDot={{ r: 5, fill: '#f59e0b' }}
+                  activeDot={{ r: 4, fill: '#f59e0b' }}
                 />
 
                 <Line
                   type="monotone"
                   dataKey="earthElevation"
                   name="Earth Elevation"
-                  stroke="#60a5fa"
+                  stroke="#38bdf8"
                   strokeWidth={2}
                   dot={false}
                   isAnimationActive={false}
-                  activeDot={{ r: 5, fill: '#3b82f6' }}
+                  activeDot={{ r: 4, fill: '#0ea5e9' }}
                 />
               </LineChart>
             </ResponsiveContainer>
           </div>
         </div>
 
-        {/* Permanent NASA / LOLA / SPICE Attribution Footer */}
+        {/* Footer Attribution */}
         <FooterAttribution />
       </main>
 

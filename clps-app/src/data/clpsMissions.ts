@@ -1,0 +1,563 @@
+export interface PayloadItem {
+  id: string;
+  name: string;
+  agency: string;
+  description: string;
+  primaryGoal: string;
+}
+
+export interface TelemetryMilestone {
+  progress: number; // 0 to 1
+  label: string;
+  met: string; // Mission Elapsed Time
+  phase: string;
+  velocityKmS: number;
+  earthDistKm: number;
+  moonDistKm: number;
+  signalDelayMs: number;
+  altitudeKm: number;
+  description: string;
+}
+
+export interface CLPSMission {
+  id: string;
+  name: string;
+  callsign: string;
+  provider: string;
+  landerType: string;
+  targetSiteName: string;
+  targetCoords: { lat: number; lon: number };
+  linkedSiteId: string; // references landingSites in data.ts
+  launchDate: string;
+  landingDate: string;
+  status: string;
+  statusColor: 'emerald' | 'cyan' | 'amber' | 'purple';
+  isRealMission: boolean;
+  launchVehicle: string;
+  overview: string;
+  scientificObjectives: string[];
+  payloads: PayloadItem[];
+  milestones: TelemetryMilestone[];
+  trajectoryControlPoints: [number, number, number][];
+}
+
+export const CLPS_MISSIONS: CLPSMission[] = [
+  {
+    id: 'im-1',
+    name: 'IM-1 Odysseus',
+    callsign: 'NOVA-C ODYSSEUS',
+    provider: 'Intuitive Machines',
+    landerType: 'Nova-C Class Lander',
+    targetSiteName: 'Malapert A Crater',
+    targetCoords: { lat: -80.13, lon: 1.44 },
+    linkedSiteId: 'malapert',
+    launchDate: 'February 15, 2024',
+    landingDate: 'February 22, 2024',
+    status: 'Mission Accomplished • Soft Touchdown',
+    statusColor: 'emerald',
+    isRealMission: true,
+    launchVehicle: 'SpaceX Falcon 9 Block 5 (Launch Complex 39A, KSC)',
+    overview:
+      'IM-1 Odysseus achieved history as the first commercial spacecraft to execute a soft touchdown on the lunar surface and the first American lunar landing in 52 years. Transiting 384,400 km across cislunar space, it delivered NASA science payloads to 80°S latitude, proving commercial payload delivery to the Moon.',
+    scientificObjectives: [
+      'Pioneer commercial landing operations in extreme southern lunar latitudes.',
+      'Demonstrate autonomous Navigation Doppler Lidar (NDL) altitude and velocity sensing.',
+      'Measure engine plume regolith cratering and dust dynamics with stereo photogrammetry (SCALPRA).',
+      'Deploy autonomous Lunar Node 1 (LN-1) radio navigation beacon for future Artemis surface assets.',
+    ],
+    payloads: [
+      {
+        id: 'ndl',
+        name: 'NDL (Navigation Doppler Lidar)',
+        agency: 'NASA Langley Research Center',
+        description: 'LIDAR-based optical sensor providing sub-meter velocity and altitude telemetry during powered descent.',
+        primaryGoal: 'Autonomous terrain tracking & real-time descent correction.',
+      },
+      {
+        id: 'ln-1',
+        name: 'LN-1 (Lunar Node 1)',
+        agency: 'NASA Marshall Space Flight Center',
+        description: 'Autonomous positioning beacon to establish surface navigation for future rovers and habitats.',
+        primaryGoal: 'GPS-equivalent lunar surface localization network.',
+      },
+      {
+        id: 'scalpra',
+        name: 'SCALPRA Stereo Cameras',
+        agency: 'NASA Langley Research Center',
+        description: 'High-speed downward multi-camera array capturing surface plume interactions and erosion during touchdown.',
+        primaryGoal: 'Regolith displacement & plume blast physics.',
+      },
+      {
+        id: 'rolses',
+        name: 'ROLSES Radio Spectrometer',
+        agency: 'NASA Goddard Space Flight Center',
+        description: 'Low-frequency radio spectrometer measuring the photoelectron sheath and lunar plasma boundary.',
+        primaryGoal: 'Deep space radio astronomy & space weather characterization.',
+      },
+      {
+        id: 'lra',
+        name: 'Laser Retroreflector Array',
+        agency: 'NASA Goddard Space Flight Center',
+        description: 'Passive eight-prism retroreflector dome permanently mounted for orbital laser altimetry ranging.',
+        primaryGoal: 'Sub-centimeter lunar geodetic distance measurement.',
+      },
+    ],
+    milestones: [
+      {
+        progress: 0.0,
+        label: 'Liftoff & LEO Insertion',
+        met: 'T+00:00:00',
+        phase: 'Launch Phase',
+        velocityKmS: 7.78,
+        earthDistKm: 320,
+        moonDistKm: 384400,
+        signalDelayMs: 1.1,
+        altitudeKm: 285,
+        description: 'Falcon 9 second-stage cutoff; Nova-C separated into 185 x 60,000 km elliptical translunar trajectory.',
+      },
+      {
+        progress: 0.18,
+        label: 'Translunar Injection (TLI)',
+        met: 'T+01:42:00',
+        phase: 'Translunar Injection',
+        velocityKmS: 10.85,
+        earthDistKm: 12400,
+        moonDistKm: 372000,
+        signalDelayMs: 41.3,
+        altitudeKm: 12400,
+        description: 'Cryogenic methane/liquid oxygen main engine burn of 420 seconds pushing Odysseus onto lunar intercept.',
+      },
+      {
+        progress: 0.45,
+        label: 'Midcourse Correction (TCM-1)',
+        met: 'T+48:15:00',
+        phase: 'Cislunar Cruise',
+        velocityKmS: 1.42,
+        earthDistKm: 220000,
+        moonDistKm: 164000,
+        signalDelayMs: 733.8,
+        altitudeKm: 220000,
+        description: 'Fine trajectory trim burn calibrating targeting vector towards lunar southern polar orbital corridor.',
+      },
+      {
+        progress: 0.75,
+        label: 'Cislunar Neutral Point',
+        met: 'T+96:30:00',
+        phase: 'Cislunar Cruise',
+        velocityKmS: 0.98,
+        earthDistKm: 326000,
+        moonDistKm: 58400,
+        signalDelayMs: 1087.4,
+        altitudeKm: 58400,
+        description: 'Crossing gravitational Lagrange boundary; lunar gravitational pull begins accelerating spacecraft.',
+      },
+      {
+        progress: 0.88,
+        label: 'Lunar Orbit Insertion (LOI)',
+        met: 'T+142:10:00',
+        phase: 'Lunar Orbit',
+        velocityKmS: 1.68,
+        earthDistKm: 384000,
+        moonDistKm: 100,
+        signalDelayMs: 1280.9,
+        altitudeKm: 92,
+        description: '408-second main engine retrograde burn inserting Odysseus into circular 92 km polar lunar orbit.',
+      },
+      {
+        progress: 0.96,
+        label: 'Powered Descent Initiation (PDI)',
+        met: 'T+167:40:00',
+        phase: 'Terminal Descent',
+        velocityKmS: 1.55,
+        earthDistKm: 384400,
+        moonDistKm: 15,
+        signalDelayMs: 1282.2,
+        altitudeKm: 12.4,
+        description: 'Throttleable methalox engine ignites for braking burn, aligning NDL laser guidance towards Malapert A.',
+      },
+      {
+        progress: 1.0,
+        label: 'Touchdown at Malapert A',
+        met: 'T+168:24:00',
+        phase: 'Surface Operations',
+        velocityKmS: 0.0,
+        earthDistKm: 384400,
+        moonDistKm: 0,
+        signalDelayMs: 1282.2,
+        altitudeKm: 0,
+        description: 'Autonomous landing touchdown confirmed at 80.13°S, 1.44°E; solar panels deployed and NASA payloads active.',
+      },
+    ],
+    // Spline curve coordinates in 3D scene: Earth is at [-80, 20, -50], Moon is at [0, 0, 0]
+    trajectoryControlPoints: [
+      [-78, 19, -48],
+      [-62, 28, -35],
+      [-38, 22, -18],
+      [-15, 12, -8],
+      [-3, 4, -4],
+      [4, 8, 2],
+      [7, 3, 5],
+      [3, -4, 8],
+      [0.2, -10.5, 5.8], // Landing target vector
+    ],
+  },
+  {
+    id: 'blue-ghost-1',
+    name: 'Blue Ghost Mission 1',
+    callsign: 'FIREFLY BLUE GHOST',
+    provider: 'Firefly Aerospace',
+    landerType: 'Blue Ghost Lander',
+    targetSiteName: 'Mare Crisium Basin',
+    targetCoords: { lat: 18.56, lon: 61.81 },
+    linkedSiteId: 'slater_plain',
+    launchDate: 'Target Q4 2024 / Q1 2025',
+    landingDate: 'Estimated Transit 45 Days',
+    status: 'Flight Integration Complete • Ready',
+    statusColor: 'cyan',
+    isRealMission: true,
+    launchVehicle: 'SpaceX Falcon 9',
+    overview:
+      'Under NASA CLPS Task Order 19D, Firefly Aerospace will deliver 10 scientific and commercial payloads to Mare Crisium, a ancient low-lying lunar impact basin. Blue Ghost will capture high-energy Earth magnetosphere dynamics and drill into the regolith to study heat flow.',
+    scientificObjectives: [
+      'Image Earth magnetosphere interactions with solar wind using Lunar Environment Heliospheric X-ray Imager (LEXI).',
+      'Measure subsurface temperature gradients down to 3 meters with thermal drill (LISTER).',
+      'Determine electrical conductivity of lunar interior mantle through Magnetotelluric Sounder (LMS).',
+      'Test next-generation sub-millimeter retroreflectors for general relativity benchmarks.',
+    ],
+    payloads: [
+      {
+        id: 'lexi',
+        name: 'LEXI X-ray Telescope',
+        agency: 'Boston University & NASA GSFC',
+        description: 'Wide-field soft X-ray telescope capturing panoramic images of Earth magnetopause reconnection.',
+        primaryGoal: 'Pioneering global magnetospheric imaging from deep space.',
+      },
+      {
+        id: 'lister',
+        name: 'LISTER Thermal Drill',
+        agency: 'Texas Tech University & NASA',
+        description: 'Autonomous pneumatic drill penetrating 2-3 meters with temperature sensor strings.',
+        primaryGoal: 'Thermal conductivity & internal radioactive heat flow of the Moon.',
+      },
+      {
+        id: 'lms',
+        name: 'Lunar Magnetotelluric Sounder',
+        agency: 'Southwest Research Institute',
+        description: 'Magnetometers and electric field electrodes recording low-frequency electromagnetic fields.',
+        primaryGoal: 'Interior mantle temperature and molten core state probe.',
+      },
+      {
+        id: 'nglr',
+        name: 'NGLR Retroreflector',
+        agency: 'University of Maryland',
+        description: '100mm ultra-precise single corner-cube prism designed to test Einstein gravitational principles.',
+        primaryGoal: 'Sub-millimeter laser lunar ranging.',
+      },
+    ],
+    milestones: [
+      {
+        progress: 0.0,
+        label: 'LEO Separation',
+        met: 'T+00:00:00',
+        phase: 'Launch Phase',
+        velocityKmS: 7.8,
+        earthDistKm: 300,
+        moonDistKm: 384400,
+        signalDelayMs: 1.0,
+        altitudeKm: 290,
+        description: 'Falcon 9 orbital insertion complete; solar arrays deployed.',
+      },
+      {
+        progress: 0.25,
+        label: 'Low-Energy Transfer Apogee',
+        met: 'T+12:00:00',
+        phase: 'Phased Earth Orbit',
+        velocityKmS: 4.8,
+        earthDistKm: 75000,
+        moonDistKm: 310000,
+        signalDelayMs: 250.0,
+        altitudeKm: 75000,
+        description: 'Highly elliptical phased orbit burns boosting apoapsis toward lunar resonance.',
+      },
+      {
+        progress: 0.55,
+        label: 'Translunar Ballistic Arc',
+        met: 'T+24:00:00',
+        phase: 'Cislunar Transit',
+        velocityKmS: 1.85,
+        earthDistKm: 210000,
+        moonDistKm: 174000,
+        signalDelayMs: 700.5,
+        altitudeKm: 210000,
+        description: 'Cruising through cislunar vacuum; magnetometers taking baseline calibration.',
+      },
+      {
+        progress: 0.85,
+        label: 'Lunar Capture',
+        met: 'T+38:00:00',
+        phase: 'Lunar Orbit',
+        velocityKmS: 1.72,
+        earthDistKm: 380000,
+        moonDistKm: 120,
+        signalDelayMs: 1267.0,
+        altitudeKm: 120,
+        description: 'Braking maneuver captures Blue Ghost into 100 km orbit above Mare Crisium.',
+      },
+      {
+        progress: 1.0,
+        label: 'Touchdown at Mare Crisium',
+        met: 'T+45:00:00',
+        phase: 'Surface Operations',
+        velocityKmS: 0.0,
+        earthDistKm: 384400,
+        moonDistKm: 0,
+        signalDelayMs: 1282.2,
+        altitudeKm: 0,
+        description: 'Precision landing in northern Mare Crisium; LEXI X-ray imager begins pointing toward Earth.',
+      },
+    ],
+    trajectoryControlPoints: [
+      [-78, 19, -48],
+      [-55, 32, -30],
+      [-30, 28, -12],
+      [-10, 16, 2],
+      [2, 10, 8],
+      [8, 12, 4],
+      [7, 6, 2],
+      [5, 4, 10], // Mare Crisium target vector
+    ],
+  },
+  {
+    id: 'im-2',
+    name: 'IM-2 Athena (PRIME-1)',
+    callsign: 'NOVA-C ATHENA',
+    provider: 'Intuitive Machines',
+    landerType: 'Nova-C Polar Ice Drill Variant',
+    targetSiteName: 'Shackleton Connecting Ridge',
+    targetCoords: { lat: -89.9, lon: 0.0 },
+    linkedSiteId: 'shackleton',
+    launchDate: 'Target 2025',
+    landingDate: 'Target 2025',
+    status: 'Environmental Testing & Integration',
+    statusColor: 'amber',
+    isRealMission: true,
+    launchVehicle: 'SpaceX Falcon 9',
+    overview:
+      'IM-2 Athena carries NASA Polar Resources Ice Mining Experiment-1 (PRIME-1) to the rim of Shackleton Crater. Armed with a 1-meter rotary percussive ice drill and a mass spectrometer, it will search for subsurface water ice while deploying the Micro-Nova hopper drone and Nokia 4G LTE cellular network.',
+    scientificObjectives: [
+      'Drill 1 meter into deep cryogenic lunar polar regolith using TRIDENT.',
+      'Analyze sublimating ice and volatiles using Mass Spectrometer MSolo.',
+      'Deploy autonomous rocket-propelled Micro-Nova hopper into a Permanently Shadowed Region (PSR).',
+      'Deploy the first extraterrestrial 4G/LTE telecommunications grid with Nokia Bell Labs.',
+    ],
+    payloads: [
+      {
+        id: 'trident',
+        name: 'TRIDENT 1-Meter Regolith Drill',
+        agency: 'Honeybee Robotics & NASA',
+        description: 'Rotary percussive hammer drill capable of penetrating cryogenic frozen rock down to 100 cm.',
+        primaryGoal: 'Volatile sample extraction from depth.',
+      },
+      {
+        id: 'msolo',
+        name: 'MSolo Mass Spectrometer',
+        agency: 'NASA Kennedy Space Center',
+        description: 'Modified commercial quadrupole mass spectrometer assessing gas composition and sublimation rates.',
+        primaryGoal: 'Identification of water, hydrogen, methane, and CO2 in regolith.',
+      },
+      {
+        id: 'micronova',
+        name: 'Micro-Nova Hopper Drone',
+        agency: 'Intuitive Machines',
+        description: 'Bipropellant thruster hopper capable of hopping over crater rims into pitch-black shadow.',
+        primaryGoal: 'Autonomous in-situ PSR exploration and extreme cold temperature mapping.',
+      },
+      {
+        id: 'nokia-lte',
+        name: 'Nokia Bell Labs Lunar 4G/LTE',
+        agency: 'Nokia Bell Labs & NASA',
+        description: 'Ultra-compact space-hardened LTE base station and user equipment.',
+        primaryGoal: 'High-bandwidth surface rover and sensor communications.',
+      },
+    ],
+    milestones: [
+      {
+        progress: 0.0,
+        label: 'Liftoff & Polar Alignment',
+        met: 'T+00:00:00',
+        phase: 'Launch Phase',
+        velocityKmS: 7.82,
+        earthDistKm: 310,
+        moonDistKm: 384400,
+        signalDelayMs: 1.0,
+        altitudeKm: 280,
+        description: 'Falcon 9 delivers Athena into high-inclination translunar departure trajectory.',
+      },
+      {
+        progress: 0.22,
+        label: 'Translunar Injection Burn',
+        met: 'T+01:38:00',
+        phase: 'Translunar Injection',
+        velocityKmS: 10.9,
+        earthDistKm: 14000,
+        moonDistKm: 370400,
+        signalDelayMs: 46.7,
+        altitudeKm: 14000,
+        description: 'Direct insertion burn targeting polar orbital plane.',
+      },
+      {
+        progress: 0.5,
+        label: 'Midcourse Correction',
+        met: 'T+52:00:00',
+        phase: 'Cislunar Cruise',
+        velocityKmS: 1.35,
+        earthDistKm: 235000,
+        moonDistKm: 149400,
+        signalDelayMs: 783.9,
+        altitudeKm: 235000,
+        description: 'Engine pulse calibrates approach to pass directly over lunar South Pole.',
+      },
+      {
+        progress: 0.85,
+        label: 'Polar LOI Orbit Capture',
+        met: 'T+138:00:00',
+        phase: 'Lunar Orbit',
+        velocityKmS: 1.7,
+        earthDistKm: 384000,
+        moonDistKm: 95,
+        signalDelayMs: 1280.9,
+        altitudeKm: 95,
+        description: 'Insertion into 95 km retrograde polar orbit crossing Shackleton Crater each revolution.',
+      },
+      {
+        progress: 1.0,
+        label: 'Touchdown at Shackleton Ridge',
+        met: 'T+166:00:00',
+        phase: 'Surface Operations',
+        velocityKmS: 0.0,
+        earthDistKm: 384400,
+        moonDistKm: 0,
+        signalDelayMs: 1282.2,
+        altitudeKm: 0,
+        description: 'Touchdown on the 89.9°S ridge; TRIDENT drill deploy sequence activated.',
+      },
+    ],
+    trajectoryControlPoints: [
+      [-78, 19, -48],
+      [-58, 22, -32],
+      [-32, 16, -15],
+      [-12, 10, -5],
+      [0, 14, 0],
+      [4, 8, -4],
+      [2, -2, -6],
+      [0, -11.9, 0.1], // Shackleton South Pole rim target
+    ],
+  },
+  {
+    id: 'griffin-1',
+    name: 'Griffin Mission One',
+    callsign: 'ASTROBOTIC GRIFFIN-1',
+    provider: 'Astrobotic Technology',
+    landerType: 'Griffin Heavy Lander',
+    targetSiteName: 'Mons Mouton Plateau',
+    targetCoords: { lat: -85.5, lon: 32.7 },
+    linkedSiteId: 'mons_mouton',
+    launchDate: 'Scheduled 2025',
+    landingDate: 'Target 2025',
+    status: 'Qualification & Flight Readiness',
+    statusColor: 'purple',
+    isRealMission: true,
+    launchVehicle: 'SpaceX Falcon Heavy',
+    overview:
+      'Astrobotic Griffin Mission One is a heavy lunar lander capable of delivering massive surface infrastructure to the Moon. Targeted for the elevated plateau of Mons Mouton near the lunar South Pole, Griffin provides wide-stance stability for landing in rough polar terrain.',
+    scientificObjectives: [
+      'Deliver up to 500 kg payload capacity to challenging high-latitude southern polar terrain.',
+      'Map lunar water ice concentrations down to 1 meter depth using neutron spectroscopy.',
+      'Survey high-elevation solar illumination and long line-of-sight communications back to Earth.',
+      'Demonstrate ramp-based surface asset deployment.',
+    ],
+    payloads: [
+      {
+        id: 'nss',
+        name: 'NSS (Neutron Spectrometer System)',
+        agency: 'NASA Ames Research Center',
+        description: 'Measures energy loss of cosmic-ray neutrons passing through regolith to detect hydrogen atoms.',
+        primaryGoal: 'High-sensitivity subsurface hydrogen and ice deposit quantification.',
+      },
+      {
+        id: 'nirvss',
+        name: 'NIRVSS Near-Infrared Spectrometer',
+        agency: 'NASA Ames Research Center',
+        description: 'Infrared reflectance spectrometer evaluating mineral composition, hydroxyl, and volatile phases.',
+        primaryGoal: 'Distinguishing water ice from mineral-bound OH groups.',
+      },
+      {
+        id: 'lra-g',
+        name: 'Laser Retroreflector Array',
+        agency: 'NASA Goddard Space Flight Center',
+        description: 'Laser retroreflector array for geodetic tracking by orbital spacecraft.',
+        primaryGoal: 'Polar surface reference marker.',
+      },
+    ],
+    milestones: [
+      {
+        progress: 0.0,
+        label: 'Falcon Heavy Trans-Lunar Burn',
+        met: 'T+00:00:00',
+        phase: 'Launch Phase',
+        velocityKmS: 11.1,
+        earthDistKm: 400,
+        moonDistKm: 384400,
+        signalDelayMs: 1.3,
+        altitudeKm: 380,
+        description: 'Falcon Heavy core stage boost; direct high-energy translunar insertion.',
+      },
+      {
+        progress: 0.4,
+        label: 'Deep Cislunar Transit',
+        met: 'T+40:00:00',
+        phase: 'Cislunar Cruise',
+        velocityKmS: 1.6,
+        earthDistKm: 210000,
+        moonDistKm: 174400,
+        signalDelayMs: 700.5,
+        altitudeKm: 210000,
+        description: 'Autonomous health check of heavy deployment systems and solar arrays.',
+      },
+      {
+        progress: 0.8,
+        label: 'Polar Lunar Orbit Capture',
+        met: 'T+110:00:00',
+        phase: 'Lunar Orbit',
+        velocityKmS: 1.74,
+        earthDistKm: 384000,
+        moonDistKm: 100,
+        signalDelayMs: 1280.9,
+        altitudeKm: 100,
+        description: 'Griffin main engines fire retrograde, capturing into polar lunar orbit.',
+      },
+      {
+        progress: 1.0,
+        label: 'Touchdown at Mons Mouton',
+        met: 'T+145:00:00',
+        phase: 'Surface Operations',
+        velocityKmS: 0.0,
+        earthDistKm: 384400,
+        moonDistKm: 0,
+        signalDelayMs: 1282.2,
+        altitudeKm: 0,
+        description: 'Touchdown on Mons Mouton plateau (85.5°S); ramp deployment ready.',
+      },
+    ],
+    trajectoryControlPoints: [
+      [-78, 19, -48],
+      [-60, 26, -34],
+      [-36, 20, -16],
+      [-14, 14, -6],
+      [2, 10, -2],
+      [6, 6, 4],
+      [4, 0, 8],
+      [1.6, -11.2, 3.8], // Mons Mouton plateau target
+    ],
+  },
+];

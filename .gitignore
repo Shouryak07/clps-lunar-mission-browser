@@ -42,5 +42,6 @@ yarn-error.log*
 *.tsbuildinfo
 .venv/
 .vite/
-*.png
+/*.png
+!clps-app/public/**
 

@@ -13,7 +13,7 @@ function App() {
   const containerRef = useRef<HTMLDivElement>(null);
 
   return (
-    <div ref={containerRef} className="relative w-screen h-screen overflow-hidden">
+    <div ref={containerRef} className="relative w-screen h-screen overflow-hidden bg-[#050508]">
       {/* ── Single Persistent WebGL Canvas (Zero unmounts between views) ── */}
       <GlobalCanvas containerRef={containerRef} />
 
